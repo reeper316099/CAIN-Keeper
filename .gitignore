@@ -11,3 +11,8 @@ data/campaigns/
 # OS noise
 .DS_Store
 Thumbs.db
+
+# Build output (PyInstaller)
+build/
+dist/
+*.zip

@@ -1,0 +1,24 @@
+# Linux package.
+#   - every push to main and every pull request: build + smoke test, upload a
+#     downloadable artifact to the workflow run
+#   - pushing a tag like v1.0.0: same, plus the zip is attached to the
+#     GitHub Release for that tag (created automatically)
+#   - "Run workflow" button: manual build on demand
+name: Package · Linux
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    uses: ./.github/workflows/build-package.yml
+    with:
+      runner: ubuntu-latest
+      label: linux-x64

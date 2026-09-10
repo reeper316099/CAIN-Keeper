@@ -1,0 +1,82 @@
+# Reusable build job shared by the per-OS release workflows
+# (release-linux.yml, release-macos.yml, release-windows.yml).
+#
+# What it does on the requested runner:
+#   1. install Python + requirements + PyInstaller
+#   2. build dist/CAIN-Keeper/ from cain_keeper.spec
+#   3. run scripts/smoke_test.py against the built executable
+#   4. zip it up (with README + LICENSE) and upload it as a workflow artifact
+#   5. on a v* tag, attach the zip to the GitHub Release for that tag
+name: Build package
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        description: GitHub-hosted runner label (ubuntu-latest, windows-latest, macos-latest, ...)
+        required: true
+        type: string
+      label:
+        description: Platform suffix for the zip name (linux-x64, windows-x64, macos-arm64, ...)
+        required: true
+        type: string
+
+jobs:
+  build:
+    name: ${{ inputs.label }}
+    runs-on: ${{ inputs.runner }}
+    permissions:
+      contents: write   # needed to attach assets to the release
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pyinstaller
+
+      - name: Build with PyInstaller
+        run: pyinstaller --noconfirm --clean cain_keeper.spec
+
+      - name: Smoke test the executable
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then EXE=dist/CAIN-Keeper/CAIN-Keeper.exe; else EXE=dist/CAIN-Keeper/CAIN-Keeper; fi
+          python scripts/smoke_test.py "$EXE"
+
+      - name: Work out the zip name
+        id: meta
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then VERSION="${GITHUB_REF#refs/tags/}"; else VERSION="dev-${GITHUB_SHA::7}"; fi
+          echo "zip=CAIN-Keeper-${VERSION}-${{ inputs.label }}.zip" >> "$GITHUB_OUTPUT"
+
+      - name: Package
+        shell: bash
+        run: |
+          cp README.md LICENSE dist/CAIN-Keeper/
+          cd dist
+          case "$RUNNER_OS" in
+            Windows) 7z a -tzip "../${{ steps.meta.outputs.zip }}" CAIN-Keeper ;;
+            macOS)   ditto -c -k --sequesterRsrc --keepParent CAIN-Keeper "../${{ steps.meta.outputs.zip }}" ;;
+            *)       zip -qr "../${{ steps.meta.outputs.zip }}" CAIN-Keeper ;;
+          esac
+          ls -la "../${{ steps.meta.outputs.zip }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.zip }}
+          path: ${{ steps.meta.outputs.zip }}
+          if-no-files-found: error
+
+      - name: Attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.meta.outputs.zip }}
+          generate_release_notes: true

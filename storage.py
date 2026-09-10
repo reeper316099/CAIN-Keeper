@@ -18,6 +18,7 @@ Layout on disk (relative to this file):
 Design rules
 ------------
 * pathlib everywhere, so the same code runs on Windows and macOS.
+* Set CAIN_KEEPER_DATA to move the data folder somewhere else.
 * Every write is atomic: the JSON is written to a temp file in the same
   directory, flushed + fsync'd, then os.replace()d over the target. A crash
   mid-save leaves the old file intact.
@@ -33,6 +34,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import sys
 import tempfile
 import threading
 from collections import defaultdict
@@ -45,8 +47,13 @@ import models
 # Paths
 # --------------------------------------------------------------------------
 
-BASE_DIR = Path(__file__).resolve().parent
-DATA_DIR = BASE_DIR / "data"
+# When running from source, everything lives next to this file. When running
+# as a packaged executable (PyInstaller, see cain_keeper.spec) the bundled
+# templates/static are unpacked to a temp folder, but the *data* folder must
+# live next to the executable so saves survive between launches.
+FROZEN = getattr(sys, "frozen", False)
+BASE_DIR = Path(sys.executable).resolve().parent if FROZEN else Path(__file__).resolve().parent
+DATA_DIR = Path(os.environ.get("CAIN_KEEPER_DATA", BASE_DIR / "data")).resolve()
 CAMPAIGNS_DIR = DATA_DIR / "campaigns"
 LIBRARY_FILE = DATA_DIR / "blasphemy_library.json"
 
