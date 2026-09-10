@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Settings · {{ campaign.name }}{% endblock %}
+{% block header %}<div class="crumbs">{{ campaign.name }}</div><h1>Campaign settings</h1>{% endblock %}
+{% block content %}
+<div class="grid cols-2">
+  <div class="card">
+    <div class="card-head"><h2>Details</h2></div>
+    <div class="stack" id="form">
+      <label class="field"><span>Name</span><input type="text" data-bind="name"></label>
+      <label class="field"><span>Description</span><textarea data-bind="description"></textarea></label>
+      <label class="field"><span>GM name</span><input type="text" data-bind="gm_name"></label>
+      <div class="hint">Created {{ campaign.created }} · id <span class="mono">{{ campaign.id }}</span></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-head"><h2>Danger zone</h2></div>
+    <p class="hint">Deleting removes the whole folder <span class="mono">data/campaigns/{{ campaign.id }}/</span> including every sheet, upload and roll. Back it up first if in doubt.</p>
+    <button class="btn btn-danger" id="delete-campaign">Delete campaign</button>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const state = {{ campaign | tojson }};
+  const saver = CK.makeSaver(() => CK.api("PUT", `/api/campaigns/${state.id}`, state));
+  CK.bind(document.getElementById("form"), state, () => saver.schedule());
+  document.getElementById("delete-campaign").addEventListener("click", async () => {
+    const typed = await CK.promptDialog(`Type the campaign name (${state.name}) to confirm deletion`);
+    if (typed === null) return;
+    if (typed.trim() !== state.name.trim()) { CK.toast("Name did not match; nothing deleted.", "error"); return; }
+    await CK.api("DELETE", `/api/campaigns/${state.id}`);
+    try { localStorage.removeItem("ck_last_campaign"); } catch (_) {}
+    window.location.href = "/";
+  });
+})();
+</script>
+{% endblock %}

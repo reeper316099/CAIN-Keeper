@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Exorcists · {{ campaign.name }}{% endblock %}
+{% block header %}<div class="crumbs">{{ campaign.name }}</div><h1>Exorcists</h1>{% endblock %}
+{% block header_actions %}<button class="btn btn-accent" id="add-exorcist">+ Add exorcist</button>{% endblock %}
+{% block content %}
+<div id="roster" class="grid auto"><div class="empty">Loading…</div></div>
+{% endblock %}
+{% block scripts %}
+<script>
+(async function () {
+  const cid = CK.campaignId;
+  const roster = document.getElementById("roster");
+
+  function suggestCat(m) { return [0, 1, 2, 4, 7].filter(t => m >= t).length; }
+
+  async function load() {
+    const list = await CK.api("GET", `/api/campaigns/${cid}/exorcists`);
+    if (!list.length) { roster.innerHTML = `<div class="empty">No exorcists yet. Add one for each player.</div>`; return; }
+    roster.innerHTML = list.map(e => {
+      const cat = e.cat.override ? e.cat.value : suggestCat(e.cat.missions_survived);
+      const injuries = e.injuries.filter(i => i.active).length + (e.brink.active ? 1 : 0);
+      const photo = e.identity.photo ? `<img src="/uploads/${cid}/${CK.esc(e.identity.photo)}" alt="">` : "";
+      return `<div class="card roster-card">
+        <div class="row">
+          <div class="id-photo" style="width:56px;height:70px;cursor:default;border-style:solid">${photo}</div>
+          <div style="flex:1;min-width:0">
+            <div class="name"><a href="/campaigns/${cid}/exorcists/${e.id}">${CK.esc(e.identity.name || "Unnamed exorcist")}</a></div>
+            <div class="muted">${CK.esc(e.blasphemies.map(b => b.name).filter(Boolean).join(", ") || e.identity.blsph || "No blasphemy")}</div>
+          </div>
+        </div>
+        <div class="meta">
+          <span class="tag accent">CAT ${cat}</span>
+          <span class="tag">Stress ${e.execution.current}/${Math.max(0, e.execution.base_max - injuries)}</span>
+          <span class="tag">Sin ${e.sin_track.current}</span>
+          <span class="tag">XP ${e.advancement.xp} · Adv ${e.advancement.advances}</span>
+          ${injuries ? `<span class="tag warn">${injuries} injur${injuries === 1 ? "y" : "ies"}</span>` : ""}
+        </div>
+        <div class="foot">
+          <a class="btn btn-sm" href="/campaigns/${cid}/exorcists/${e.id}">Open sheet</a>
+          <button class="btn btn-sm btn-ghost btn-danger" data-del="${e.id}">Delete</button>
+        </div>
+      </div>`;
+    }).join("");
+    roster.querySelectorAll("[data-del]").forEach(b => b.addEventListener("click", async () => {
+      if (!await CK.confirmDialog("Delete this exorcist sheet? This cannot be undone.")) return;
+      await CK.api("DELETE", `/api/campaigns/${cid}/exorcists/${b.dataset.del}`);
+      load();
+    }));
+  }
+
+  document.getElementById("add-exorcist").addEventListener("click", async () => {
+    const name = await CK.promptDialog("New exorcist", "Name");
+    if (name === null) return;
+    const e = await CK.api("POST", `/api/campaigns/${cid}/exorcists`, { name });
+    window.location.href = `/campaigns/${cid}/exorcists/${e.id}`;
+  });
+  load();
+})();
+</script>
+{% endblock %}

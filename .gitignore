@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Per-campaign save data (character sheets, rolls, uploads).
+# Remove this line if you want to version-control your campaigns.
+data/campaigns/
+
+# OS noise
+.DS_Store
+Thumbs.db

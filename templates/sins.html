@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Sins · {{ campaign.name }}{% endblock %}
+{% block header %}<div class="crumbs">{{ campaign.name }}</div><h1>Sins</h1>{% endblock %}
+{% block header_actions %}<button class="btn btn-accent" id="add-sin">+ Add sin</button>{% endblock %}
+{% block content %}
+<div id="roster" class="grid auto"><div class="empty">Loading…</div></div>
+{% endblock %}
+{% block scripts %}
+<script>
+(async function () {
+  const cid = CK.campaignId;
+  const roster = document.getElementById("roster");
+  const ROMAN = ["0", "I", "II", "III", "IV", "V", "VI", "VII"];
+  async function load() {
+    const [list, mission] = await Promise.all([
+      CK.api("GET", `/api/campaigns/${cid}/sins`), CK.api("GET", `/api/campaigns/${cid}/mission`)]);
+    if (!list.length) { roster.innerHTML = `<div class="empty">No sins recorded. Add one when the hunt begins.</div>`; return; }
+    roster.innerHTML = list.map(s => {
+      const threshold = 8 + (mission.pressure || 0) + (s.category || 0);
+      const res = s.resolution ? `<span class="tag ${s.resolution === "executed" ? "ok" : s.resolution === "failed" ? "accent" : "warn"}">${s.resolution}</span>` : "";
+      return `<div class="card roster-card">
+        <div class="name"><a href="/campaigns/${cid}/sins/${s.id}">${CK.esc(s.name || "Unnamed sin")}</a></div>
+        <div class="muted">${CK.esc(s.type || "Type unknown")}${s.host ? " · host: " + CK.esc(s.host) : ""}</div>
+        <div class="meta">
+          <span class="tag accent">CAT ${ROMAN[s.category] || s.category}</span>
+          <span class="tag">Form ${CK.esc(s.form)}</span>
+          <span class="tag">Execution ${s.execution.slashes}/${threshold}</span>
+          ${s.deceased ? '<span class="tag warn">deceased</span>' : ""}${res}
+        </div>
+        <div class="foot">
+          <a class="btn btn-sm" href="/campaigns/${cid}/sins/${s.id}">Open sheet</a>
+          <button class="btn btn-sm btn-ghost btn-danger" data-del="${s.id}">Delete</button>
+        </div>
+      </div>`;
+    }).join("");
+    roster.querySelectorAll("[data-del]").forEach(b => b.addEventListener("click", async () => {
+      if (!await CK.confirmDialog("Delete this sin sheet? This cannot be undone.")) return;
+      await CK.api("DELETE", `/api/campaigns/${cid}/sins/${b.dataset.del}`);
+      load();
+    }));
+  }
+  document.getElementById("add-sin").addEventListener("click", async () => {
+    const name = await CK.promptDialog("New sin", "Name (refrain from speaking aloud)");
+    if (name === null) return;
+    const s = await CK.api("POST", `/api/campaigns/${cid}/sins`, { name });
+    window.location.href = `/campaigns/${cid}/sins/${s.id}`;
+  });
+  load();
+})();
+</script>
+{% endblock %}

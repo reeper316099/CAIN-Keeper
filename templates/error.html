@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Error · CAIN Keeper{% endblock %}
+{% block header %}<h1>{{ status }}</h1>{% endblock %}
+{% block content %}
+<div class="card">
+  <p>{{ detail }}</p>
+  <a href="/" class="btn">Back to campaigns</a>
+</div>
+{% endblock %}

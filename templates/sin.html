@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}{{ sin.name or "Sin" }} · {{ campaign.name }}{% endblock %}
+{% block header %}
+<div class="crumbs"><a href="/campaigns/{{ campaign.id }}/sins">{{ campaign.name }} · Sins</a></div>
+<h1 id="sheet-title">{{ sin.name or "Recorded Manifestation" }}</h1>
+{% endblock %}
+{% block header_actions %}
+<button class="btn btn-sm" id="use-as-roller" title="Set the dice panel's roller name to this sin">Roll as this sin</button>
+{% endblock %}
+{% block content %}
+<div class="sheet" id="sheet">
+
+  {# ---- Vital information card -------------------------------------- #}
+  <div class="card w6">
+    <div class="card-head"><h2>Vital information card</h2><span class="hint">Refrain from speaking name aloud</span></div>
+    <div class="fields cols-2">
+      <label class="field span-2"><span>Name</span><input type="text" data-bind="name"></label>
+      <label class="field"><span>Host</span><input type="text" data-bind="host"></label>
+      <label class="check" style="align-self:end"><input type="checkbox" data-bind="deceased"> Deceased?</label>
+      <label class="field"><span>Executed (date)</span><input type="date" data-bind="executed_date"></label>
+      <label class="field"><span>Type</span><input type="text" data-bind="type"></label>
+      <div class="field"><span>Form</span>
+        <div class="btn-row" id="form-picker"></div></div>
+      <div class="field"><span>Category (Sin CAT)</span>
+        <div class="cat-picker" id="cat-picker"></div></div>
+    </div>
+    <div class="rule-text" style="margin-top:10px">Instructions: retreat to safe distance · do not maintain eye contact · immediately call 994.</div>
+  </div>
+
+  {# ---- Traumas ------------------------------------------------------ #}
+  <div class="card w6">
+    <div class="card-head"><h2>Recorded traumas</h2></div>
+    <div class="stack" id="traumas"></div>
+    <div class="rule-text">Traumas can be used to counter a sin's reaction, reducing stress suffered by one target by 1d3 and inflicting 1d3 slashes on the sin.</div>
+    <div id="trauma-result" hidden class="banner warn"></div>
+  </div>
+
+  {# ---- Execution ---------------------------------------------------- #}
+  <div class="card w8">
+    <div class="card-head"><h2>Execution talisman · slash when taking harm</h2><span class="hint" id="threshold-note"></span></div>
+    <div class="stack">
+      <div class="track-label"><span class="name">Execution</span><div id="execution"></div><span class="count" id="execution-count"></span></div>
+      <div class="btn-row">
+        <button class="btn btn-xs" id="slash-1">Slash +1</button>
+        <button class="btn btn-xs" id="heal-1d3">Heal 1d3</button>
+        <button class="btn btn-xs" id="heal-2d3">Heal 2d3 (if full)</button>
+      </div>
+      <div id="retreat-note" class="banner warn" hidden>4+ slashes: must retreat to the palace until pressure increases and heal 1d3 (2d3 if full). Cannot retreat inside the palace; at the mercy of exorcists if full.</div>
+      <div id="execution-full" class="banner" hidden>Execution talisman filled. Resolve the sin.</div>
+      <hr class="divider">
+      <div class="field"><span>Resolution</span>
+        <div class="btn-row" id="resolution"></div>
+        <div class="hint">Sparing requires at least 1 trauma recorded.</div>
+      </div>
+    </div>
+  </div>
+
+  {# ---- Extra tracks ------------------------------------------------- #}
+  <div class="card w4">
+    <div class="card-head"><h2>Additional tracks</h2></div>
+    <div class="stack" id="tracks"></div>
+    <div class="hint">Two extra talisman-style tracks (evolve with an advance): write what each represents, set a length, slash as it progresses.</div>
+  </div>
+
+  {# ---- Conflict reference panel ----------------------------------- #}
+  <div class="card">
+    <div class="card-head"><h2>Conflict · reaction die</h2><span class="hint">Roll buttons load each table's tiers into the dice panel.</span></div>
+    <div class="grid cols-3">
+      <div class="card" style="background:var(--bg)">
+        <div class="card-head"><h2>Attack</h2><button class="btn btn-xs btn-accent" data-react="attack">Roll</button></div>
+        <label class="field"><span>Attack with</span><textarea data-bind="attack_with" placeholder="How the sin attacks"></textarea></label>
+        <div class="reaction" style="margin-top:8px">
+          <div class="tier"><span class="k">1</span><span>5 stress</span></div>
+          <div class="tier"><span class="k">2-3</span><span>3 stress</span></div>
+          <div class="tier"><span class="k">4+</span><span>2 stress</span></div>
+        </div>
+        <div class="hint">Adjust up or down by +1 depending on situation.</div>
+        <hr class="divider">
+        <label class="field"><span>Severe attack · only usable on a 1, once a scene</span><textarea data-bind="severe_attack" placeholder="Details of the severe attack"></textarea></label>
+      </div>
+      <div class="card" style="background:var(--bg)">
+        <div class="card-head"><h2>Complicate</h2><button class="btn btn-xs btn-accent" data-react="complicate">Roll</button></div>
+        <p class="hint">Add a twist to the fight. Complications can: make something hard · deal 1 stress a round to all exorcists · make the sin take 1 less slash on its talisman under certain circumstances · make the sin deal 1 more stress under certain circumstances · change the parameters of the fight. The same effect cannot stack with itself.</p>
+        <div class="reaction">
+          <div class="tier"><span class="k">1</span><span>6 talisman</span></div>
+          <div class="tier"><span class="k">2-3</span><span>4 talisman</span></div>
+          <div class="tier"><span class="k">4-6</span><span>2 action</span></div>
+        </div>
+        <div class="hint">Worse die = more effort to deal with. Up to three complications per conflict scene total.</div>
+      </div>
+      <div class="card" style="background:var(--bg)">
+        <div class="card-head"><h2>Threaten</h2><button class="btn btn-xs btn-accent" data-react="threaten">Roll</button></div>
+        <p class="hint">Threaten a worse consequence, once a round. An exorcist must immediately make an action roll to counter it. If executed: inflict stress, separate an exorcist completely, afflict an exorcist, cause collateral damage, or massively change the parameters of the fight.</p>
+        <div class="reaction">
+          <div class="tier"><span class="k">1</span><span>1 injury</span></div>
+          <div class="tier"><span class="k">2-3</span><span>5 stress</span></div>
+          <div class="tier"><span class="k">4-6</span><span>3 stress</span></div>
+        </div>
+        <hr class="divider">
+        <div class="row between"><span class="hint">Or improvise: (1) strongest, (2/3) strong, (4/5) weaker, (6) weakest reaction.</span><button class="btn btn-xs" data-react="improvise">Roll</button></div>
+      </div>
+    </div>
+  </div>
+
+  {# ---- Domains ------------------------------------------------------ #}
+  <div class="card">
+    <div class="card-head"><h2>Domains</h2></div>
+    <div class="grid cols-3">
+      <label class="field"><span>Domain</span><textarea data-bind="domains.0" style="min-height:110px"></textarea></label>
+      <label class="field"><span>Domain</span><textarea data-bind="domains.1" style="min-height:110px"></textarea></label>
+      <label class="field"><span>Domain</span><textarea data-bind="domains.2" style="min-height:110px"></textarea></label>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Notes</h2></div>
+    <textarea data-bind="notes"></textarea>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>window.SIN_ID = "{{ sin.id }}";</script>
+<script src="/static/js/sin.js"></script>
+{% endblock %}
