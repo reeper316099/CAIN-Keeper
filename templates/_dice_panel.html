@@ -1,0 +1,79 @@
+{# Persistent dice roller. Wired up by static/js/dice.js. #}
+<aside class="dice-panel" id="dice-panel">
+  <div class="dice-head">
+    <div class="title-row">
+      <button class="btn btn-sm btn-ghost dice-toggle" id="dice-collapse" title="Collapse / expand">⚄</button>
+      <h2>Dice</h2>
+      <button class="btn btn-xs btn-ghost" id="dice-pin" title="Pinned: panel docks beside the page. Unpinned: floats over it.">📌</button>
+      <button class="btn btn-xs btn-ghost" id="dice-close-mobile" title="Close">✕</button>
+    </div>
+    <input type="text" id="dice-roller" placeholder="Roller name (GM, exorcist…)" autocomplete="off">
+  </div>
+
+  <div class="dice-body">
+    <div class="dice-result" id="dice-result"><span class="muted">No roll yet.</span></div>
+
+    {# 1. Action pool #}
+    <section class="dice-sec">
+      <h4>Action roll</h4>
+      <div class="dice-row">
+        <label>Skill</label><input type="number" id="dice-skill" min="0" max="12" value="1">
+        <label>+ Bonus</label><input type="number" id="dice-bonus" min="0" max="12" value="0">
+      </div>
+      <div class="dice-row">
+        <button class="btn btn-sm" id="dice-hard" title="Successes only on a 6">Hard</button>
+        <button class="btn btn-sm" id="dice-risky" title="Label only: the Admin rolls the risk die">Risky</button>
+        <input type="text" id="dice-label" placeholder="Label (e.g. Force)" style="flex:1">
+      </div>
+      <div class="hint" id="dice-bonus-warning" hidden>Bonus dice above +3 exceed the sheet's "+3 dice maximum".</div>
+      <div class="dice-row" style="margin-top:6px">
+        <button class="btn btn-accent btn-sm" id="dice-roll-pool">Roll pool</button>
+        <span class="hint">4/5/6 succeed (6 only when Hard). 4+ successes = full success.</span>
+      </div>
+    </section>
+
+    {# 2. Risk / reaction die #}
+    <section class="dice-sec">
+      <h4>Risk / reaction die</h4>
+      <div class="dice-tier"><span class="k">1</span><input type="text" id="tier-1" placeholder="Strongest / worst"></div>
+      <div class="dice-tier"><span class="k">2-3</span><input type="text" id="tier-2" placeholder="Moderate"></div>
+      <div class="dice-tier"><span class="k">4-6</span><input type="text" id="tier-3" placeholder="Weakest"></div>
+      <div class="dice-row" style="margin-top:6px">
+        <button class="btn btn-accent btn-sm" id="dice-roll-risk">Roll d6</button>
+        <button class="btn btn-sm btn-ghost" id="dice-tiers-reset" title="Reset tier labels">Reset labels</button>
+      </div>
+    </section>
+
+    {# 3. Simple dice #}
+    <section class="dice-sec">
+      <h4>Simple dice</h4>
+      <div class="dice-row">
+        <button class="btn btn-sm" data-simple="1d6">1d6</button>
+        <button class="btn btn-sm" data-simple="1d3">1d3</button>
+        <button class="btn btn-sm" data-simple="2d3">2d3</button>
+        <button class="btn btn-sm" data-simple="2d6">2d6</button>
+      </div>
+      <div class="dice-row">
+        <label>Sin marks</label><input type="number" id="dice-marks" min="0" max="9" value="0">
+        <button class="btn btn-sm" id="dice-roll-resist" title="1d6 + marks. 7 or lower keeps control; a natural 1 always succeeds">Sin resistance</button>
+      </div>
+    </section>
+
+    {# 4. Rest #}
+    <section class="dice-sec">
+      <h4>Rest</h4>
+      <div class="dice-row">
+        <button class="btn btn-sm" id="dice-roll-rest">Roll 2d3</button>
+        <span class="hint">Each d3: psyche burst, heal stress, or clear hook slashes.</span>
+      </div>
+    </section>
+
+    <section>
+      <div class="row between" style="margin-bottom:6px">
+        <h4 class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.1em">Recent rolls</h4>
+        <a id="dice-history-link" href="#" class="hint" hidden>full history →</a>
+      </div>
+      <div class="dice-recent" id="dice-recent"><span class="hint">Rolls are logged per campaign.</span></div>
+    </section>
+  </div>
+</aside>

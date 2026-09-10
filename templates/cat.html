@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}CAT Reference · CAIN Keeper{% endblock %}
+{% block header %}<div class="crumbs">Reference</div><h1>CAT · Category Rating System</h1>{% endblock %}
+{% block content %}
+<div class="card table-wrap">
+  <table class="cat-table">
+    <thead>
+      <tr>
+        <th>Category designate</th>
+        <th class="tier"><span class="roman">0</span><span class="nm">—</span></th>
+        <th class="tier"><span class="roman">I</span><span class="nm">IMP · 1</span></th>
+        <th class="tier"><span class="roman">II</span><span class="nm">GEIST · 2</span></th>
+        <th class="tier"><span class="roman">III</span><span class="nm">REVENANT · 3</span></th>
+        <th class="tier"><span class="roman">IV</span><span class="nm">WRAITH · 4</span></th>
+        <th class="tier"><span class="roman">V</span><span class="nm">DEMON · 5</span></th>
+        <th class="tier"><span class="roman">VI</span><span class="nm">GOD · 6</span></th>
+        <th class="tier"><span class="roman">VII</span><span class="nm">DEMON GOD · 7</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td class="rowhead">People</td><td>One</td><td>A few</td><td>Small group</td><td>Large group</td><td>A crowd</td><td>A large crowd</td><td>Thousands of people</td><td>Many thousands of people</td></tr>
+      <tr><td class="rowhead">Size</td><td>Human size</td><td>Heavy furniture</td><td>Large animal</td><td>Vehicle</td><td>Large vehicle</td><td>Building</td><td>Large building</td><td>Skyscraper</td></tr>
+      <tr><td class="rowhead">Area</td><td>Personal</td><td>A few people</td><td>Entire room</td><td>A few rooms</td><td>Whole building</td><td>A city block</td><td>A whole neighborhood</td><td>A whole town</td></tr>
+      <tr><td class="rowhead">Range / Distance<br><small class="muted" style="text-transform:none;letter-spacing:0">0–2 Short · 3–4 Long · 5+ Extreme</small></td><td>Touch</td><td>Same room</td><td>Across the street</td><td>Down the block</td><td>A few blocks away</td><td>Across town</td><td>Visual range</td><td>Over the horizon</td></tr>
+      <tr><td class="rowhead">Speed</td><td>Average human</td><td>Fast human</td><td>Fast animal</td><td>Car</td><td>Train</td><td>Maglev</td><td>Airliner</td><td>Jet fighter</td></tr>
+      <tr><td class="rowhead">Magnitude</td><td>Small</td><td>Noticeable</td><td>Large</td><td>Very large</td><td>Massive</td><td>Destructive</td><td>Overwhelming</td><td>Cataclysmic</td></tr>
+    </tbody>
+  </table>
+</div>
+<div class="grid cols-2" style="margin-top:14px">
+  <div class="card">
+    <div class="card-head"><h2>Comparing CAT</h2></div>
+    <ul style="margin:0;padding-left:18px">
+      <li>Use CAT 0 when describing general human or mundane capabilities.</li>
+      <li>Well trained humans can sometimes reach CAT 1.</li>
+      <li><strong>Higher CAT</strong> effects vs <strong>lower CAT</strong> targets are <strong>more effective</strong> and may not even require a roll if they are 3 or more lower.</li>
+      <li><strong>Lower CAT</strong> effects vs <strong>higher CAT</strong> targets are <strong>less effective</strong>, more risky, or harder, and may be impossible if they are 3 or more higher.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <div class="card-head"><h2>Exorcist CAT</h2></div>
+    <p>Missions survived → CAT: <span class="mono">0 → I · 1 → II · 2 → III · 4 → IV · 7 → V</span></p>
+    <p class="hint">Category affects the parameters and effectiveness of powers. Psyche is ½ CAT, rounded up. Refer to doctrine TM451 in case of a Category 5+ event.</p>
+  </div>
+</div>
+{% endblock %}

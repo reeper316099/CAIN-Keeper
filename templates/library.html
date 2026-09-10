@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Blasphemy Library · CAIN Keeper{% endblock %}
+{% block header %}<div class="crumbs">Reference · shared by every campaign</div><h1>Blasphemy Library</h1>{% endblock %}
+{% block header_actions %}<button class="btn" id="add-entry">+ Add blasphemy</button>{% endblock %}
+{% block content %}
+<p class="hint" style="margin-bottom:12px">Define each Blasphemy once here (passive + full power list). Exorcist sheets pick from this list and copy the passive and powers onto the sheet, so later edits here don't rewrite existing characters. Stored in <span class="mono">data/blasphemy_library.json</span>.</p>
+<div id="entries" class="grid cols-2"></div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/library.js"></script>
+{% endblock %}

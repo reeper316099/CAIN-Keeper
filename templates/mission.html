@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Mission tracker · {{ campaign.name }}{% endblock %}
+{% block header %}<div class="crumbs">{{ campaign.name }}</div><h1>Mission / session tracker</h1>{% endblock %}
+{% block header_actions %}
+<button class="btn btn-sm" id="rest">Rest (2d3)</button>
+<button class="btn btn-sm btn-accent" id="archive">End session</button>
+{% endblock %}
+{% block content %}
+<div class="sheet" id="tracker">
+  <div id="pressure-banner" class="card" hidden style="grid-column:span 12;border-color:var(--accent)">
+    <div class="banner">⚠ Pressure filled: the situation gets out of control. The sin increases in CAT by +1 and things get worse.</div>
+    <div class="row" id="sin-bumps" style="margin-top:8px"></div>
+  </div>
+
+  {# ---- The Hunt: mission flow -------------------------------------- #}
+  <div class="card w4">
+    <div class="card-head"><h2>The Hunt · mission flow</h2></div>
+    <label class="field" style="margin-bottom:8px"><span>Session</span><input type="text" data-bind="session_name" placeholder="Session / mission name"></label>
+    <div class="stack" id="flow" style="gap:4px"></div>
+    <div class="rule-text" style="margin-top:8px">Exorcists are dispatched when signs of a sin appear and must investigate. They know only its type and trauma questions. Locate its lair and execute it before catastrophe strikes. Find the palace: a sin creates a parasitic pocket dimension and cannot be slain outside. Return for debrief · RNR allowances.</div>
+  </div>
+
+  {# ---- Tension / Pressure ------------------------------------------ #}
+  <div class="card w8">
+    <div class="card-head"><h2>Tension · Pressure</h2></div>
+    <div class="stack">
+      <div class="track-label"><span class="name">Tension</span><div id="tension"></div><span class="count" id="tension-count"></span>
+        <button class="btn btn-xs" id="tension-slash">Slash</button></div>
+      <div class="hint">Slash when a scene passes, or a '1' is rolled on risk (once per scene only). When it fills: increase pressure by 1, clear tension, then make a GM move.</div>
+      <div class="track-label"><span class="name">Pressure</span><div id="pressure"></div><span class="count" id="pressure-count"></span></div>
+      <div class="hint">Slash when tension fills out, degrading the situation. Pressure increases also slash every exorcist's hooks and raise every sin's execution threshold.</div>
+      <hr class="divider">
+      <div class="field"><span>Session log</span><div id="log" class="stack" style="gap:2px;max-height:180px;overflow-y:auto"></div>
+        <div class="row"><input type="text" id="log-input" placeholder="Add a log note…" style="flex:1"><button class="btn btn-sm" id="log-add">Add</button></div></div>
+    </div>
+  </div>
+
+  {# ---- Talismans ---------------------------------------------------- #}
+  <div class="card w8">
+    <div class="card-head"><h2>Talisman workspace</h2><div class="right"><button class="btn btn-sm" id="talisman-add">+ Affix talisman</button></div></div>
+    <div class="hint" style="margin-bottom:8px">Write what each talisman represents, set its length (2 short · 3–5 medium · 6–8 long), slash 1 for each success when acting. Actions that don't fill it up represent partial progress.</div>
+    <div class="grid cols-2" id="talismans"></div>
+  </div>
+
+  {# ---- Rest ---------------------------------------------------------- #}
+  <div class="card w4">
+    <div class="card-head"><h2>Rest</h2></div>
+    <div class="rule-text">Characters rest as a group. Increase pressure by 1 and roll 2d3. Then for each d3, gain that many psyche burst, heal that much stress, or remove slashes from a hook.</div>
+    <div id="rest-assign" class="stack"><span class="hint">Press <b>Rest (2d3)</b> above to roll.</span></div>
+  </div>
+
+  <div class="card w6">
+    <div class="card-head"><h2>Notes</h2></div>
+    <textarea data-bind="notes" style="min-height:120px"></textarea>
+  </div>
+  <div class="card w6">
+    <div class="card-head"><h2>Past sessions</h2></div>
+    <div id="history"></div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/mission.js"></script>
+{% endblock %}

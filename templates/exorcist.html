@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% block title %}{{ exorcist.identity.name or "Exorcist" }} · {{ campaign.name }}{% endblock %}
+{% block header %}
+<div class="crumbs"><a href="/campaigns/{{ campaign.id }}/exorcists">{{ campaign.name }} · Exorcists</a></div>
+<h1 id="sheet-title">{{ exorcist.identity.name or "Registered Exorcist" }}</h1>
+{% endblock %}
+{% block header_actions %}
+<button class="btn btn-sm" id="use-as-roller" title="Set the dice panel's roller name to this exorcist">Roll as this exorcist</button>
+{% endblock %}
+{% block content %}
+{# The whole sheet is rendered by static/js/exorcist.js from the JSON document. #}
+<div class="sheet" id="sheet" data-exorcist="{{ exorcist.id }}">
+
+  {# ---- ID card ------------------------------------------------------- #}
+  <div class="card w6">
+    <div class="card-head"><h2>Registered Exorcist · ID card</h2><div class="right"><span class="cat-badge" id="cat-badge"></span></div></div>
+    <div class="id-card">
+      <div>
+        <div class="id-photo" id="photo" title="Click to upload a photo"></div>
+        <input type="file" id="photo-input" accept="image/*" hidden>
+        <div class="row" style="margin-top:6px"><button class="btn btn-xs btn-ghost" id="photo-remove">Remove photo</button></div>
+      </div>
+      <div class="fields cols-2">
+        <label class="field span-2"><span>Name</span><input type="text" data-bind="identity.name"></label>
+        <label class="field"><span>XID</span><input type="text" data-bind="identity.xid"></label>
+        <label class="field"><span>CID</span><input type="text" data-bind="identity.cid"></label>
+        <label class="field"><span>AGND · agency code</span><input type="text" data-bind="identity.agnd"></label>
+        <label class="field"><span>BLSPH · blasphemy</span><input type="text" data-bind="identity.blsph"></label>
+        <label class="field"><span>SX</span><input type="text" data-bind="identity.sex"></label>
+        <label class="field"><span>HT</span><input type="text" data-bind="identity.height"></label>
+        <label class="field"><span>WT</span><input type="text" data-bind="identity.weight"></label>
+        <label class="field"><span>Hair</span><input type="text" data-bind="identity.hair"></label>
+        <label class="field"><span>Eyes</span><input type="text" data-bind="identity.eyes"></label>
+      </div>
+    </div>
+  </div>
+
+  {# ---- Skills -------------------------------------------------------- #}
+  <div class="card w6">
+    <div class="card-head"><h2>Registered Skills</h2><div class="right"><span class="hint" id="skills-cap"></span></div></div>
+    <div id="skills"></div>
+    <hr class="divider">
+    <div class="track-label"><span class="name">Improvements</span><div id="improvements"></div><span class="count" id="improvements-count"></span></div>
+    <div class="hint">Spend 1 advance to improve, then tick a box. Two skills at 3 max.</div>
+  </div>
+
+  {# ---- CAT / Psyche / Burst ----------------------------------------- #}
+  <div class="card w4">
+    <div class="card-head"><h2>CAT · Category Rating</h2></div>
+    <div class="stack">
+      <div class="row">
+        <label class="field inline"><span>Missions survived</span><input type="number" min="0" data-bind="cat.missions_survived"></label>
+        <span class="hint">suggests CAT <strong id="cat-suggested"></strong></span>
+      </div>
+      <label class="check"><input type="checkbox" data-bind="cat.override"> Override the suggestion</label>
+      <div class="cat-picker" id="cat-picker"></div>
+      <div class="hint">Thresholds: 0 → I, 1 → II, 2 → III, 4 → IV, 7 → V. Category affects the parameters and effectiveness of powers.</div>
+      <hr class="divider">
+      <div class="track-label"><span class="name">Psyche</span><div id="psyche"></div><span class="count" id="psyche-count"></span>
+        <button class="btn btn-xs" id="roll-psyche">Roll Psyche</button></div>
+      <div class="hint">½ CAT, rounded up. Use for your powers.</div>
+      <div class="track-label"><span class="name">Burst</span><div id="burst"></div><span class="count" id="burst-count"></span></div>
+      <div class="btn-row">
+        <button class="btn btn-xs" id="burst-spend">Spend burst (+1D / power)</button>
+        <button class="btn btn-xs" id="burst-sin">…or gain 1d3 sin instead</button>
+      </div>
+      <div class="hint">Use your powers or gain +1D. Then mark one, or gain 1d3 sin instead.</div>
+    </div>
+  </div>
+
+  {# ---- Execution + Sin ---------------------------------------------- #}
+  <div class="card w8">
+    <div class="card-head"><h2>Execution · Sin</h2></div>
+    <div class="stack">
+      <div class="track-label"><span class="name">Execution (stress)</span><div id="execution"></div><span class="count" id="execution-count"></span></div>
+      <div class="hint">Starts at 6, −1 per injury. If filled, gain an injury and roll over the remainder of stress.</div>
+      <div id="execution-full" class="banner" hidden>Execution filled: gain an injury, clear all stress, then the remainder rolls over.</div>
+      <hr class="divider">
+      <div class="track-label"><span class="name">Sin</span><div id="sin-track"></div><span class="count" id="sin-count"></span></div>
+      <div class="row">
+        <label class="field inline"><span>Crossed out</span><input type="number" min="0" max="10" data-bind="sin_track.crossed_out"></label>
+        <span class="hint" id="sin-cap-note"></span>
+        <button class="btn btn-xs" id="roll-resist">Resistance check</button>
+      </div>
+      <div id="sin-overflow" class="banner" hidden>!! SIN OVERFLOW !! Give up or make a resistance check.</div>
+      <div class="rule-text">Resistance: roll 1d6 and add 1 for each sin mark. Gain a sin mark on a total of 7 or lower and keep control. A result of 1 always succeeds. On success, clear all sin, gain a sin mark then permanently cross out two boxes. Otherwise, give up.</div>
+      <div class="grid cols-3" id="sin-marks"></div>
+    </div>
+  </div>
+
+  {# ---- Health evaluation form --------------------------------------- #}
+  <div class="card w6">
+    <div class="card-head"><h2>Health evaluation form</h2></div>
+    <div class="stack">
+      <div class="field"><span>Injuries · each gives −1 stress</span><div id="injuries" class="stack"></div></div>
+      <label class="check"><input type="checkbox" data-bind="visitation_rights"> Visitation rights acquired (unlocks the brink-of-death box)</label>
+      <div id="brink"></div>
+      <div class="rule-text">Suffer an injury when execution fills up. Clear all stress when gaining an injury, then the remainder rolls over. When suffering instant death, may suffer Sin Overflow instead and erase 1 injury.</div>
+      <hr class="divider">
+      <div class="field"><span>Hooks</span><div id="hooks" class="stack"></div></div>
+      <div class="rule-text">Slash a hook once when: gaining the same hook again · pressure increases · rolling a 1 on risk. When a hook fills up, erase and resolve it. Gain hooks when bargaining with the Admin, from your own powers, or when there's a delayed consequence.</div>
+      <hr class="divider">
+      <label class="field"><span>Afflictions</span><textarea data-bind="afflictions" placeholder="Record afflictions here. Debrief after mission for decontamination."></textarea></label>
+      <hr class="divider">
+      <div class="track-label"><span class="name">Pathos · Divine Agony</span><div id="pathos"></div></div>
+      <div class="rule-text">When you take no successes on a roll, gain an affliction, fill out a hook, gain an injury, or an exorcist dies or suffers sin overflow, store a pathos. Once a session (once a scene for the whole group) burn all pathos for +1 die per pathos burned. Clear after session end.</div>
+    </div>
+  </div>
+
+  {# ---- Advancement --------------------------------------------------- #}
+  <div class="card w6">
+    <div class="card-head"><h2>Advancement</h2></div>
+    <div class="stack">
+      <div class="track-label"><span class="name">XP</span><div id="xp"></div><span class="count" id="xp-count"></span></div>
+      <div class="row">
+        <label class="field inline"><span>XP to advance</span><input type="number" min="1" max="20" data-bind="advancement.xp_base_max"></label>
+        <span class="hint" id="xp-note"></span>
+      </div>
+      <div class="track-label"><span class="name">Advances</span><div id="advances"></div>
+        <button class="btn btn-xs" id="cash-advance" title="Move a full XP track into an advance">Cash advance</button></div>
+      <hr class="divider">
+      <div class="field"><span>End of session</span>
+        <label class="check"><input type="checkbox" data-bind="advancement.checklist.survived"> Did you survive?</label>
+        <label class="check"><input type="checkbox" data-bind="advancement.checklist.first_agenda"> Did you follow your first agenda item?</label>
+        <label class="check"><input type="checkbox" data-bind="advancement.checklist.bolded_agenda"> Did you follow at least one <strong>bolded</strong> agenda item?</label>
+        <label class="check"><input type="checkbox" data-bind="advancement.checklist.injury_or_affliction"> Did you take an injury or affliction?</label>
+      </div>
+      <div class="btn-row"><button class="btn btn-sm btn-accent" id="end-session">Mark XP &amp; clear checklist</button><span class="hint">Also clears pathos. Cashes an advance each time XP fills.</span></div>
+    </div>
+  </div>
+
+  {# ---- Kit ----------------------------------------------------------- #}
+  <div class="card w6">
+    <div class="card-head"><h2>Registered Kit</h2><div class="right"><label class="field inline"><span>Max KP</span><input type="number" min="0" max="20" data-bind="kit.points_max"></label></div></div>
+    <div class="stack">
+      <div class="track-label"><span class="name">Kit points</span><div id="kp"></div><span class="count" id="kp-count"></span>
+        <button class="btn btn-xs" id="kp-refill">Refill</button></div>
+      <div class="hint">Spend KP to pull out the following items any time:</div>
+      <div id="kit-items"></div>
+      <button class="btn btn-sm" id="kit-add">+ Add item</button>
+      <hr class="divider">
+      <div class="row">
+        <span class="name" style="font-weight:600">Scrip</span>
+        <input type="number" data-bind="kit.scrip" style="width:80px">
+        <input type="text" id="scrip-note" placeholder="note (e.g. mission payout)" style="flex:1;min-width:120px">
+        <input type="number" id="scrip-delta" value="5" style="width:64px">
+        <button class="btn btn-xs" id="scrip-gain">Gain</button>
+        <button class="btn btn-xs" id="scrip-lose">Spend</button>
+      </div>
+      <div class="hint">Paid out per mission: 5 success · 3 spare · −1 failure · +3 advance.</div>
+      <div id="scrip-log" class="stack" style="gap:2px"></div>
+    </div>
+  </div>
+
+  {# ---- Agenda -------------------------------------------------------- #}
+  <div class="card w6">
+    <div class="card-head"><h2>Agenda · Registered Abilities</h2></div>
+    <div class="stack">
+      <label class="field"><span>Agenda</span><input type="text" data-bind="agenda.name" placeholder="Agenda name"></label>
+      <label class="field"><span>Description</span><textarea data-bind="agenda.description" placeholder="Describe registered agenda here."></textarea></label>
+      <div class="field"><span>Agenda items · swap agendas between missions, keep any bolded items</span><div id="agenda-items"></div>
+        <div><button class="btn btn-sm" id="agenda-add">+ Add item</button></div></div>
+      <div class="field"><span>Agenda abilities · spend an Advance to gain one · 5 max</span><div id="agenda-abilities" class="stack"></div>
+        <div><button class="btn btn-sm" id="ability-add">+ Add ability</button></div></div>
+    </div>
+  </div>
+
+  {# ---- Blasphemy ----------------------------------------------------- #}
+  <div class="card">
+    <div class="card-head"><h2>Blasphemy</h2><div class="right"><button class="btn btn-sm" id="blasphemy-add">+ Add blasphemy (costs an Advance)</button></div></div>
+    <div class="rule-text">Spend an Advance to gain a new power. Spend an Advance to gain a new blasphemy: if you do, gain its passive and a power, cross out a sin box, and increase XP to advance by +1. Only 2 starting powers are known.</div>
+    <div class="grid cols-2" style="margin-top:10px">
+      <div class="card" style="background:var(--bg)">
+        <div class="card-head"><h2>Universal power</h2></div>
+        <div id="universal-powers" class="stack"></div>
+      </div>
+      <div id="blasphemies" class="stack" style="grid-column: 1 / -1"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Notes</h2></div>
+    <textarea data-bind="notes" placeholder="Anything else worth keeping on the sheet."></textarea>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>window.EXORCIST_ID = "{{ exorcist.id }}";</script>
+<script src="/static/js/exorcist.js"></script>
+{% endblock %}

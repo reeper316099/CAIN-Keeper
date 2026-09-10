@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Roll history · {{ campaign.name }}{% endblock %}
+{% block header %}<div class="crumbs">{{ campaign.name }}</div><h1>Roll history</h1>{% endblock %}
+{% block header_actions %}<button class="btn btn-danger btn-sm" id="clear-rolls">Clear history</button>{% endblock %}
+{% block content %}
+<div class="card" style="margin-bottom:14px">
+  <div class="row">
+    <input type="search" id="f-text" placeholder="Search label / result…" style="flex:1;min-width:160px">
+    <select id="f-roller"><option value="">All rollers</option></select>
+    <select id="f-kind">
+      <option value="">All kinds</option>
+      <option value="pool">Action pool</option>
+      <option value="risk">Risk die</option>
+      <option value="simple">Simple</option>
+      <option value="resistance">Sin resistance</option>
+      <option value="rest">Rest</option>
+      <option value="trauma">Trauma</option>
+    </select>
+    <span class="hint" id="count"></span>
+  </div>
+</div>
+<div class="card table-wrap">
+  <table>
+    <thead><tr><th>When</th><th>Roller</th><th>Kind</th><th>Label</th><th>Result</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(async function () {
+  const cid = CK.campaignId;
+  let rolls = [];
+  const rows = document.getElementById("rows");
+  const fText = document.getElementById("f-text"), fRoller = document.getElementById("f-roller"), fKind = document.getElementById("f-kind");
+
+  function render() {
+    const q = fText.value.toLowerCase(), r = fRoller.value, k = fKind.value;
+    const shown = rolls.filter(e => (!r || e.roller === r) && (!k || e.kind === k)
+      && (!q || (e.label + " " + e.summary).toLowerCase().includes(q))).reverse();
+    document.getElementById("count").textContent = `${shown.length} of ${rolls.length}`;
+    rows.innerHTML = shown.map(e => `<tr>
+      <td class="muted" style="white-space:nowrap">${CK.fmtTime(e.ts)}</td>
+      <td>${CK.esc(e.roller)}</td><td><span class="tag">${e.kind}</span></td>
+      <td>${CK.esc(e.label)}</td>
+      <td>${CK.esc(e.summary)}${e.dice ? ` <span class="mono muted">[${e.dice.join(" ")}]</span>` : ""}</td></tr>`).join("")
+      || `<tr><td colspan="5" class="muted">No rolls match.</td></tr>`;
+  }
+  async function load() {
+    rolls = await CK.api("GET", `/api/campaigns/${cid}/rolls`);
+    const rollers = [...new Set(rolls.map(e => e.roller))].sort();
+    fRoller.innerHTML = `<option value="">All rollers</option>` + rollers.map(n => `<option>${CK.esc(n)}</option>`).join("");
+    render();
+  }
+  [fText, fRoller, fKind].forEach(el => el.addEventListener("input", render));
+  document.getElementById("clear-rolls").addEventListener("click", async () => {
+    if (!await CK.confirmDialog("Clear the entire roll history for this campaign?")) return;
+    await CK.api("DELETE", `/api/campaigns/${cid}/rolls`);
+    load();
+  });
+  Dice.onRoll(() => load());
+  load();
+})();
+</script>
+{% endblock %}
