@@ -28,6 +28,38 @@ python main.py --open     # serve and open the browser
 python main.py --port 9000
 ```
 
+## Packaged releases (no Python needed)
+
+Every push to `main` builds a standalone package for each platform with
+PyInstaller; download it from the workflow run's artifacts. Pushing a tag such
+as `v1.0.0` attaches the three zips to a GitHub Release:
+
+| Workflow | Runner | Archive |
+| --- | --- | --- |
+| `Package · Windows` | windows-latest | `CAIN-Keeper-<version>-windows-x64.zip` |
+| `Package · macOS` | macos-latest (Apple Silicon) | `CAIN-Keeper-<version>-macos-arm64.zip` |
+| `Package · Linux` | ubuntu-latest | `CAIN-Keeper-<version>-linux-x64.zip` |
+
+Unzip, then run `CAIN-Keeper.exe` (Windows) or `./CAIN-Keeper` (macOS/Linux).
+The app opens your browser automatically and creates its `data/` folder next
+to the executable. Pass `--no-open` to skip the browser, `--port 9000` to
+change the port, or set `CAIN_KEEPER_DATA=/some/folder` to keep saves
+elsewhere.
+
+The builds are not code-signed. macOS will quarantine the download; clear it
+once with `xattr -dr com.apple.quarantine CAIN-Keeper` (or right-click →
+Open). Windows SmartScreen may ask you to confirm the first launch.
+
+To cut a release:
+
+```
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+To build locally instead: `pip install pyinstaller && pyinstaller cain_keeper.spec`
+(output in `dist/CAIN-Keeper/`, verified by `python scripts/smoke_test.py`).
+
 ## Layout of the project
 
 | File / folder | Purpose |
@@ -42,6 +74,9 @@ python main.py --port 9000
 | `static/js/exorcist.js`, `sin.js`, `mission.js`, `library.js` | One script per sheet. |
 | `static/css/style.css` | Dark theme, single accent colour. |
 | `data/` | Your saves (see below). |
+| `cain_keeper.spec` | PyInstaller build recipe used by the release workflows. |
+| `scripts/smoke_test.py` | Starts a packaged build and checks it answers. |
+| `.github/workflows/` | Per-OS package workflows plus the shared build job. |
 
 ## Where your data lives
 

@@ -46,6 +46,7 @@ from __future__ import annotations
 
 import argparse
 import socket
+import sys
 import threading
 import time
 import webbrowser
@@ -62,11 +63,13 @@ import dice
 import models
 import storage
 
-BASE_DIR = Path(__file__).resolve().parent
+# Templates and static files: next to this file from source, or inside the
+# PyInstaller bundle (sys._MEIPASS) when running as a packaged executable.
+RESOURCE_DIR = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 
 app = FastAPI(title="CAIN Keeper", docs_url="/api/docs", redoc_url=None)
-app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
-templates = Jinja2Templates(directory=BASE_DIR / "templates")
+app.mount("/static", StaticFiles(directory=RESOURCE_DIR / "static"), name="static")
+templates = Jinja2Templates(directory=RESOURCE_DIR / "templates")
 
 #: Static rules data handed to the frontend once (see /api/reference).
 REFERENCE = {
@@ -491,16 +494,25 @@ def main() -> None:
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--open", action="store_true", help="open the browser once the server is up")
-    parser.add_argument("--reload", action="store_true", help="auto-reload on code changes (dev)")
+    parser.add_argument("--no-open", action="store_true", help="never open the browser (packaged builds open it by default)")
+    parser.add_argument("--reload", action="store_true", help="auto-reload on code changes (dev, source only)")
     args = parser.parse_args()
 
     storage.load_library()  # seeds blasphemy_library.json on first run
     url = f"http://{args.host}:{args.port}"
-    if args.open:
+    # A double-clicked packaged executable should just open the app.
+    open_browser = (args.open or storage.FROZEN) and not args.no_open
+    if open_browser:
         threading.Thread(target=_open_browser_when_ready, args=(url, args.host, args.port),
                          daemon=True).start()
     print(f"CAIN Keeper running at {url}  (Ctrl+C to stop)")
-    uvicorn.run("main:app", host=args.host, port=args.port, reload=args.reload)
+    print(f"Data folder: {storage.DATA_DIR}")
+    if args.reload and not storage.FROZEN:
+        uvicorn.run("main:app", host=args.host, port=args.port, reload=True)
+    else:
+        # Pass the app object (not an import string) so this works inside a
+        # PyInstaller bundle where module discovery is limited.
+        uvicorn.run(app, host=args.host, port=args.port)
 
 
 if __name__ == "__main__":
