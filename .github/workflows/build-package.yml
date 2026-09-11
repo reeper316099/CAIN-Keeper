@@ -7,6 +7,7 @@
 #   3. run scripts/smoke_test.py against the built executable
 #   4. zip it up (with README + LICENSE) and upload it as a workflow artifact
 #   5. on a v* tag, attach the zip to the GitHub Release for that tag
+#      (creating it, with generated notes, only if it doesn't exist yet)
 name: Build package
 
 on:
@@ -20,6 +21,14 @@ on:
         description: Platform suffix for the zip name (linux-x64, windows-x64, macos-arm64, ...)
         required: true
         type: string
+      release_notes:
+        description: >-
+          Let this job generate release notes if the tag has no release yet.
+          Only ONE of the per-OS workflows should pass true, otherwise each job
+          appends its own copy of the notes to the shared release.
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -74,9 +83,26 @@ jobs:
           path: ${{ steps.meta.outputs.zip }}
           if-no-files-found: error
 
+      # Notes are generated only when this job has to create the release itself.
+      # A release made on the GitHub website (or by another OS job that got
+      # there first) keeps whatever notes it already has.
+      - name: Check whether the release already exists
+        if: startsWith(github.ref, 'refs/tags/v')
+        id: rel
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then EXISTS=true; else EXISTS=false; fi
+          if [ "${{ inputs.release_notes }}" = "true" ] && [ "$EXISTS" = "false" ]; then GEN=true; else GEN=false; fi
+          echo "exists=$EXISTS" >> "$GITHUB_OUTPUT"
+          echo "generate=$GEN" >> "$GITHUB_OUTPUT"
+          echo "release exists: $EXISTS, generate notes: $GEN"
+
       - name: Attach to GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ steps.meta.outputs.zip }}
-          generate_release_notes: true
+          generate_release_notes: ${{ steps.rel.outputs.generate == 'true' }}
