@@ -22,3 +22,4 @@ jobs:
     with:
       runner: ubuntu-latest
       label: linux-x64
+      release_notes: true   # only this workflow may generate notes, and only if the release doesn't exist yet

@@ -50,7 +50,10 @@ The builds are not code-signed. macOS will quarantine the download; clear it
 once with `xattr -dr com.apple.quarantine CAIN-Keeper` (or right-click →
 Open). Windows SmartScreen may ask you to confirm the first launch.
 
-To cut a release:
+To cut a release, either publish one on the GitHub website with a new `v*`
+tag (your title and notes are kept; the zips are attached a couple of minutes
+later), or push a tag from the command line and let the Linux workflow create
+the release with generated notes:
 
 ```
 git tag v1.0.0
