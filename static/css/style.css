@@ -383,13 +383,23 @@ tr.clickable:hover td { background: var(--bg-4); }
     transform: translateX(-100%); transition: transform 0.15s ease; box-shadow: 8px 0 30px rgba(0,0,0,0.5);
   }
   .sidebar.open { transform: none; }
-  .menu-toggle { display: inline-flex; }
+  /* The open sidebar (z-index 60) physically sits over the hamburger
+     button underneath it, so a second tap to close would hit the
+     sidebar instead of the button. Raise the button above it. */
+  .menu-toggle { display: inline-flex; position: relative; z-index: 65; }
   .main { padding: 14px 16px 90px; }
   .dice-panel { position: fixed; right: 0; top: 0; z-index: 70; width: min(360px, 100vw); transform: translateX(100%); transition: transform 0.15s ease; }
   .dice-panel.mobile-open { transform: none; }
   .dice-panel.collapsed { width: min(360px, 100vw); }
   .dice-panel.collapsed .dice-body { display: flex; }
   .dice-panel.collapsed .dice-head .title-row > * { display: initial; }
+  /* Pin (docked-vs-floating) and collapse (shrink-to-a-rail) only mean
+     something in the desktop grid layout; the mobile drawer is always
+     fixed-position and always full content, so both toggles would sit
+     there with no visible effect. Hide them rather than leave dead
+     controls; the drawer opens via the FAB and closes via its close
+     button (or the hamburger for the sidebar) either way. */
+  #dice-pin, #dice-collapse { display: none; }
   .btn.dice-fab {
     display: inline-flex; position: fixed; right: 14px; bottom: 14px; z-index: 65;
     border-radius: 999px; padding: 12px 16px; font-weight: 700; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
