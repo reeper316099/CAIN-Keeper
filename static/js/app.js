@@ -324,11 +324,19 @@
     }
     const menu = document.getElementById("menu-toggle");
     const sidebar = document.getElementById("sidebar");
+    const sidebarClose = document.getElementById("sidebar-close");
+    const sidebarBackdrop = document.getElementById("sidebar-backdrop");
     if (menu && sidebar) {
-      menu.addEventListener("click", () => sidebar.classList.toggle("open"));
-      document.addEventListener("click", e => {
-        if (sidebar.classList.contains("open") && !sidebar.contains(e.target) && e.target !== menu) sidebar.classList.remove("open");
-      });
+      const openSidebar = () => { sidebar.classList.add("open"); if (sidebarBackdrop) sidebarBackdrop.classList.add("visible"); };
+      const closeSidebar = () => { sidebar.classList.remove("open"); if (sidebarBackdrop) sidebarBackdrop.classList.remove("visible"); };
+      // The hamburger still toggles both ways as a convenience, but closing
+      // never DEPENDS on hitting it again - the dedicated close button and
+      // the backdrop are both guaranteed reachable regardless of how any
+      // particular browser stacks the open sidebar against the button it
+      // was opened from.
+      menu.addEventListener("click", () => (sidebar.classList.contains("open") ? closeSidebar() : openSidebar()));
+      if (sidebarClose) sidebarClose.addEventListener("click", closeSidebar);
+      if (sidebarBackdrop) sidebarBackdrop.addEventListener("click", closeSidebar);
     }
     if (CK.campaignId) {
       try { localStorage.setItem("ck_last_campaign", CK.campaignId); localStorage.setItem("ck_last_campaign_name", CK.campaignName); } catch (_) {}
