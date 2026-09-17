@@ -170,7 +170,10 @@ input[type=text], input[type=number], input[type=date], input[type=search], sele
 }
 input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 input[type=number] { width: 72px; }
-textarea { width: 100%; resize: vertical; min-height: 64px; line-height: 1.4; }
+/* Textareas auto-grow to fit their content (see CK.autosize in app.js),
+   so manual resize is disabled and there's no inner scrollbar. min-height
+   keeps an empty box from looking like a sliver. */
+textarea { width: 100%; resize: none; overflow: hidden; min-height: 64px; line-height: 1.4; }
 select { cursor: pointer; }
 input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
 input[type=radio] { accent-color: var(--accent); }
@@ -257,6 +260,9 @@ tr.clickable:hover td { background: var(--bg-4); }
 }
 .list-row:last-child { border-bottom: 0; }
 .list-row input, .list-row textarea { width: 100%; }
+/* Compact rows (kit items) start at roughly one line instead of the
+   taller default, then grow with the description like any textarea. */
+.list-row textarea { min-height: 36px; }
 .list-row .rm { justify-self: end; }
 
 /* ---------- Trackers (pips + segments) --------------------------------- */
