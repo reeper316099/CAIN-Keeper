@@ -170,7 +170,9 @@
     root.querySelectorAll("[data-roll-skill]").forEach(b => b.addEventListener("click", () => {
       const s = b.dataset.rollSkill;
       Dice.setRoller(ex.identity.name || "Exorcist");
-      Dice.setPool({ skill: ex.skills[s], bonus: 0, hard: false, risky: false, label: s[0].toUpperCase() + s.slice(1) });
+      // The pips are EXTRA dice on top of a base 1, not the total pool: a
+      // skill of 0 still rolls 1d6, a skill of 2 rolls 3d6.
+      Dice.setPool({ skill: ex.skills[s] + 1, bonus: 0, hard: false, risky: false, label: s[0].toUpperCase() + s.slice(1) });
       Dice.open();
     }));
     $("skills-cap").textContent = `${d.skillsAtCap} / 2 skills at 3`;
