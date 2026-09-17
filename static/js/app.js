@@ -61,6 +61,12 @@
     return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   };
 
+  /** Escaped text with line breaks preserved as <br> - for showing saved
+   * textarea content back as read-only HTML (e.g. an archived session). */
+  CK.escNl = function (s) {
+    return CK.esc(s).replace(/\n/g, "<br>");
+  };
+
   CK.toast = function (msg, type = "") {
     const box = document.getElementById("toasts");
     if (!box) return;
@@ -167,6 +173,23 @@
   // including the couple of one-off modal fields that skip data-bind/CK.bind
   // (see CK.bind below for textareas whose value is set programmatically).
   document.addEventListener("input", e => { if (e.target.tagName === "TEXTAREA") CK.autosize(e.target); });
+
+  // A textarea's height was set for the WIDTH it had when last measured.
+  // Anything that changes that width after the fact - resizing the window,
+  // opening/closing the mobile sidebar, pinning or unpinning the dice panel
+  // (which changes .main's width) - re-wraps the text into more or fewer
+  // lines without re-measuring, so the box ends up too short and clips its
+  // last line. Re-autosize every textarea whenever the layout might have
+  // changed. Debounced so a window drag-resize doesn't thrash.
+  let resizeAutosizeTimer = null;
+  function autosizeAllTextareas() {
+    document.querySelectorAll("textarea").forEach(CK.autosize);
+  }
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeAutosizeTimer);
+    resizeAutosizeTimer = setTimeout(autosizeAllTextareas, 120);
+  });
+  CK.autosizeAllTextareas = autosizeAllTextareas;
 
   /* ---------- State helpers --------------------------------------------- */
 
@@ -301,11 +324,19 @@
     }
     const menu = document.getElementById("menu-toggle");
     const sidebar = document.getElementById("sidebar");
+    const sidebarClose = document.getElementById("sidebar-close");
+    const sidebarBackdrop = document.getElementById("sidebar-backdrop");
     if (menu && sidebar) {
-      menu.addEventListener("click", () => sidebar.classList.toggle("open"));
-      document.addEventListener("click", e => {
-        if (sidebar.classList.contains("open") && !sidebar.contains(e.target) && e.target !== menu) sidebar.classList.remove("open");
-      });
+      const openSidebar = () => { sidebar.classList.add("open"); if (sidebarBackdrop) sidebarBackdrop.classList.add("visible"); };
+      const closeSidebar = () => { sidebar.classList.remove("open"); if (sidebarBackdrop) sidebarBackdrop.classList.remove("visible"); };
+      // The hamburger still toggles both ways as a convenience, but closing
+      // never DEPENDS on hitting it again - the dedicated close button and
+      // the backdrop are both guaranteed reachable regardless of how any
+      // particular browser stacks the open sidebar against the button it
+      // was opened from.
+      menu.addEventListener("click", () => (sidebar.classList.contains("open") ? closeSidebar() : openSidebar()));
+      if (sidebarClose) sidebarClose.addEventListener("click", closeSidebar);
+      if (sidebarBackdrop) sidebarBackdrop.addEventListener("click", closeSidebar);
     }
     if (CK.campaignId) {
       try { localStorage.setItem("ck_last_campaign", CK.campaignId); localStorage.setItem("ck_last_campaign_name", CK.campaignName); } catch (_) {}

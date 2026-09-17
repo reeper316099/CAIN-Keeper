@@ -22,6 +22,7 @@
     <div class="brand">
       <a href="/" class="mark" style="color:var(--accent)">CAIN</a>
       <span class="sub">Keeper</span>
+      <button class="btn btn-sm btn-ghost sidebar-close" id="sidebar-close" aria-label="Close menu">✕</button>
     </div>
 
     <div class="campaign-switcher">
@@ -59,6 +60,12 @@
 
     <div class="sidebar-foot">As above, so below.<br>Data lives in <span class="mono">/data</span>.</div>
   </nav>
+
+  {# Mobile-only dimmed overlay behind the open sidebar: tapping anywhere on
+     it closes the sidebar. A big, unambiguous click target beats relying on
+     re-tapping the hamburger button, which some browsers left unreachable
+     once the sidebar was drawn on top of it (see static/js/app.js). #}
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
 
   {# ---------------- Main column ---------------- #}
   <main class="main">

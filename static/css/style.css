@@ -108,7 +108,19 @@ small, .muted { color: var(--muted); }
 .nav a .ico { width: 18px; text-align: center; opacity: 0.8; }
 .campaign-switcher select { width: 100%; }
 .sidebar-foot { margin-top: auto; font-size: 11px; color: var(--muted); padding: 0 6px; }
-.menu-toggle { display: none; }
+/* ID selectors, not classes: .btn's own "display: inline-flex" (defined
+   later in this file) ties on specificity with a class selector here and
+   wins on source order, which left the hamburger visibly showing at
+   DESKTOP width too - completely independent of viewport or browser, and
+   the actual root cause of "the sidebar looks open by default and the
+   hamburger does nothing": at that width .sidebar.open has no rule at
+   all (it only means something inside the mobile media query below), so
+   clicking a button that should not even be there just toggled a class
+   with zero visible effect. An ID selector always outranks .btn's class
+   selector regardless of where either is defined. */
+#menu-toggle { display: none; }
+#sidebar-close { display: none; }
+#sidebar-backdrop { display: none; }
 
 /* ---------- Dice panel -------------------------------------------------- */
 .dice-panel {
@@ -119,8 +131,12 @@ small, .muted { color: var(--muted); }
   display: flex; flex-direction: column;
   transition: width 0.15s ease;
 }
-.dice-panel.collapsed { width: 44px; }
-.dice-panel.collapsed .dice-body, .dice-panel.collapsed .dice-head .title-row > *:not(.dice-toggle) { display: none; }
+.dice-panel.collapsed { width: 44px; overflow: hidden; }
+/* #dice-roller is a sibling of .title-row (not a child of it), so it needs
+   its own selector here or it's left peeking out of the shrunk panel. */
+.dice-panel.collapsed .dice-body,
+.dice-panel.collapsed .dice-head .title-row > *:not(.dice-toggle),
+.dice-panel.collapsed #dice-roller { display: none; }
 .dice-panel.collapsed .dice-head { padding: 10px 6px; }
 .dice-panel.floating { position: fixed; right: 0; top: 0; z-index: 40; box-shadow: -8px 0 30px rgba(0,0,0,0.45); }
 .dice-head { padding: 12px; border-bottom: 1px solid var(--border); }
@@ -353,6 +369,8 @@ tr.clickable:hover td { background: var(--bg-4); }
 /* mission history */
 .history-item { padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
 .history-item:last-child { border: 0; }
+.history-item.clickable { cursor: pointer; margin: 0 -8px; padding: 8px; border-radius: 6px; }
+.history-item.clickable:hover, .history-item.clickable:focus-visible { background: var(--bg-4); outline: none; }
 
 /* ---------- Toasts / modals -------------------------------------------- */
 .toasts { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 100; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
@@ -383,10 +401,19 @@ tr.clickable:hover td { background: var(--bg-4); }
     transform: translateX(-100%); transition: transform 0.15s ease; box-shadow: 8px 0 30px rgba(0,0,0,0.5);
   }
   .sidebar.open { transform: none; }
-  /* The open sidebar (z-index 60) physically sits over the hamburger
-     button underneath it, so a second tap to close would hit the
-     sidebar instead of the button. Raise the button above it. */
-  .menu-toggle { display: inline-flex; position: relative; z-index: 65; }
+  /* Give the sidebar its own unambiguous close button plus a full-screen
+     backdrop, rather than relying solely on re-tapping the hamburger:
+     the open sidebar visually sits over the button that opened it, so a
+     second tap landing correctly is a fragile way to close it even once
+     the z-index below is right. The toggle stays as a convenience. */
+  #menu-toggle { display: inline-flex; position: relative; z-index: 65; }
+  #sidebar-close { display: inline-flex; margin-left: auto; }
+  #sidebar-backdrop {
+    display: block; position: fixed; inset: 0; z-index: 55;
+    background: rgba(0, 0, 0, 0.5); opacity: 0; pointer-events: none;
+    transition: opacity 0.15s ease;
+  }
+  #sidebar-backdrop.visible { opacity: 1; pointer-events: auto; }
   .main { padding: 14px 16px 90px; }
   .dice-panel { position: fixed; right: 0; top: 0; z-index: 70; width: min(360px, 100vw); transform: translateX(100%); transition: transform 0.15s ease; }
   .dice-panel.mobile-open { transform: none; }

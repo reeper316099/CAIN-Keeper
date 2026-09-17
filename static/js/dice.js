@@ -40,6 +40,12 @@
     panel.classList.toggle("collapsed", LS.get("ck_dice_collapsed") === "1");
     panel.classList.toggle("floating", LS.get("ck_dice_pinned") === "0");
     $("dice-pin").classList.toggle("active", LS.get("ck_dice_pinned") !== "0");
+    // Collapsing/pinning resizes this panel's grid column, which changes
+    // .main's width too - an already-grown textarea there can be left too
+    // short for its now-differently-wrapped text. Wait for the panel's
+    // width transition (150ms, see style.css) to settle before remeasuring.
+    clearTimeout(applyChrome._resizeTimer);
+    applyChrome._resizeTimer = setTimeout(() => { if (CK.autosizeAllTextareas) CK.autosizeAllTextareas(); }, 200);
   }
   applyChrome();
   $("dice-collapse").addEventListener("click", () => {
