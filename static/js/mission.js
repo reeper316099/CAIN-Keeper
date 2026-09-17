@@ -193,13 +193,50 @@
     });
   });
 
+  const truncate = (s, n) => (s && s.length > n) ? s.slice(0, n).trimEnd() + "…" : (s || "");
+
   async function renderHistory() {
     const hist = await CK.api("GET", `/api/campaigns/${cid}/mission/history`);
-    $("history").innerHTML = hist.slice().reverse().map(h => `<div class="history-item">
+    $("history").innerHTML = hist.slice().reverse().map(h => `<div class="history-item clickable" data-history="${h.id}" tabindex="0" role="button">
       <div class="row between"><b>${CK.esc(h.session_name || "Untitled session")}</b><span class="muted">${CK.fmtTime(h.ended)}</span></div>
-      <div class="hint">${CK.esc(h.summary || "No summary.")}</div>
-      <div class="row" style="margin-top:4px"><span class="tag">pressure ${h.pressure_final}</span><span class="tag">${h.flow_completed}/7 steps</span><span class="tag">${(h.talismans || []).length} talismans</span></div>
+      <div class="hint">${CK.esc(truncate(h.summary, 140) || "No summary.")}</div>
+      <div class="row" style="margin-top:4px"><span class="tag">pressure ${h.pressure_final}</span><span class="tag">${h.flow_completed}/7 steps</span><span class="tag">${(h.talismans || []).length} talisman${(h.talismans || []).length === 1 ? "" : "s"}</span>${h.notes ? '<span class="tag">has notes</span>' : ""}</div>
     </div>`).join("") || `<span class="hint">No archived sessions yet.</span>`;
+    $("history").querySelectorAll("[data-history]").forEach(el => {
+      const open = () => openHistoryDetail(hist.find(h => h.id === el.dataset.history));
+      el.addEventListener("click", open);
+      el.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } });
+    });
+  }
+
+  /** Full detail view for one archived session: everything the compact
+   * list row leaves out (full summary/notes text, every mission-flow step,
+   * every talisman, the complete session log). */
+  function openHistoryDetail(h) {
+    if (!h) return;
+    const flowRows = ref.mission_flow.map((step, i) => {
+      const done = Array.isArray(h.flow) ? !!h.flow[i] : i < h.flow_completed;  // old entries: no per-step data, best effort
+      return `<div class="row" style="gap:6px"><span class="${done ? "accent" : "muted"}">${done ? "✓" : "○"}</span><span>${CK.esc(step)}</span></div>`;
+    }).join("");
+    const talismanRows = (h.talismans || []).map(t =>
+      `<div class="hint">${CK.esc(t.name || "Unnamed talisman")} — ${t.fill}/${t.length}${t.fill >= t.length ? " (filled)" : ""}</div>`
+    ).join("") || `<span class="hint">None affixed.</span>`;
+    const logRows = (h.log || []).slice().reverse().map(l =>
+      `<div class="hint"><span class="muted">${CK.fmtTime(l.ts)}</span> ${CK.esc(l.text)}</div>`
+    ).join("") || `<span class="hint">Nothing logged.</span>`;
+
+    CK.modal({
+      title: h.session_name || "Untitled session",
+      body: `<div class="stack">
+        <div class="hint">${CK.fmtTime(h.started)} → ${CK.fmtTime(h.ended)} · pressure ${h.pressure_final}</div>
+        <div class="field"><span>Summary</span><div class="rule-text">${CK.escNl(h.summary) || "No summary."}</div></div>
+        <div class="field"><span>Notes</span><div class="rule-text">${CK.escNl(h.notes) || "No notes."}</div></div>
+        <div class="field"><span>Mission flow</span>${flowRows}</div>
+        <div class="field"><span>Talismans</span>${talismanRows}</div>
+        <div class="field"><span>Session log</span><div class="stack" style="gap:2px;max-height:220px;overflow-y:auto">${logRows}</div></div>
+      </div>`,
+      buttons: [{ label: "Close" }],
+    });
   }
 
   function renderAll() { renderFlow(); renderTracks(); renderPressureBanner(); renderLog(); renderTalismans(); renderHistory(); }

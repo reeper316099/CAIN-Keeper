@@ -61,6 +61,12 @@
     return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   };
 
+  /** Escaped text with line breaks preserved as <br> - for showing saved
+   * textarea content back as read-only HTML (e.g. an archived session). */
+  CK.escNl = function (s) {
+    return CK.esc(s).replace(/\n/g, "<br>");
+  };
+
   CK.toast = function (msg, type = "") {
     const box = document.getElementById("toasts");
     if (!box) return;
@@ -167,6 +173,23 @@
   // including the couple of one-off modal fields that skip data-bind/CK.bind
   // (see CK.bind below for textareas whose value is set programmatically).
   document.addEventListener("input", e => { if (e.target.tagName === "TEXTAREA") CK.autosize(e.target); });
+
+  // A textarea's height was set for the WIDTH it had when last measured.
+  // Anything that changes that width after the fact - resizing the window,
+  // opening/closing the mobile sidebar, pinning or unpinning the dice panel
+  // (which changes .main's width) - re-wraps the text into more or fewer
+  // lines without re-measuring, so the box ends up too short and clips its
+  // last line. Re-autosize every textarea whenever the layout might have
+  // changed. Debounced so a window drag-resize doesn't thrash.
+  let resizeAutosizeTimer = null;
+  function autosizeAllTextareas() {
+    document.querySelectorAll("textarea").forEach(CK.autosize);
+  }
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeAutosizeTimer);
+    resizeAutosizeTimer = setTimeout(autosizeAllTextareas, 120);
+  });
+  CK.autosizeAllTextareas = autosizeAllTextareas;
 
   /* ---------- State helpers --------------------------------------------- */
 

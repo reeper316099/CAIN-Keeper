@@ -67,8 +67,29 @@ import storage
 # PyInstaller bundle (sys._MEIPASS) when running as a packaged executable.
 RESOURCE_DIR = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 
+
+class NoCacheStaticFiles(StaticFiles):
+    """
+    StaticFiles that forces revalidation on every load.
+
+    Browsers cache CSS/JS aggressively by default even without an explicit
+    Cache-Control header, using a heuristic freshness window based on
+    Last-Modified. That's fine for a normal website but wrong here: this is
+    a locally-run app users update in place (git pull, or a new downloaded
+    build) while a browser tab or profile may already have the old files
+    cached, so a real fix can silently appear not to have happened. Starlette
+    still sends ETag/Last-Modified, so an unchanged file gets a cheap 304 -
+    this only forces the *check*, not a full re-download every time.
+    """
+
+    async def get_response(self, path: str, scope):
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 app = FastAPI(title="CAIN Keeper", docs_url="/api/docs", redoc_url=None)
-app.mount("/static", StaticFiles(directory=RESOURCE_DIR / "static"), name="static")
+app.mount("/static", NoCacheStaticFiles(directory=RESOURCE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=RESOURCE_DIR / "templates")
 
 #: Static rules data handed to the frontend once (see /api/reference).
@@ -370,14 +391,19 @@ def api_archive_mission(cid: str, payload: dict = Body(default={})):
     """
     _campaign_or_404(cid)
     tracker = storage.load_mission(cid)
+    flow = tracker.get("flow", [])
     summary = {
         "id": models.new_id(6),
         "session_name": tracker.get("session_name", ""),
         "started": tracker.get("started"),
         "ended": models.now_iso(),
         "summary": str(payload.get("summary", "")),
+        # The running "Notes" field is separate from the archive modal's own
+        # wrap-up summary - it was being discarded when the tracker reset.
+        "notes": tracker.get("notes", ""),
         "pressure_final": tracker.get("pressure", 0),
-        "flow_completed": sum(1 for f in tracker.get("flow", []) if f),
+        "flow": flow,  # raw per-step booleans, for the history detail view
+        "flow_completed": sum(1 for f in flow if f),
         "talismans": tracker.get("talismans", []),
         "log": tracker.get("log", []),
     }

@@ -119,8 +119,12 @@ small, .muted { color: var(--muted); }
   display: flex; flex-direction: column;
   transition: width 0.15s ease;
 }
-.dice-panel.collapsed { width: 44px; }
-.dice-panel.collapsed .dice-body, .dice-panel.collapsed .dice-head .title-row > *:not(.dice-toggle) { display: none; }
+.dice-panel.collapsed { width: 44px; overflow: hidden; }
+/* #dice-roller is a sibling of .title-row (not a child of it), so it needs
+   its own selector here or it's left peeking out of the shrunk panel. */
+.dice-panel.collapsed .dice-body,
+.dice-panel.collapsed .dice-head .title-row > *:not(.dice-toggle),
+.dice-panel.collapsed #dice-roller { display: none; }
 .dice-panel.collapsed .dice-head { padding: 10px 6px; }
 .dice-panel.floating { position: fixed; right: 0; top: 0; z-index: 40; box-shadow: -8px 0 30px rgba(0,0,0,0.45); }
 .dice-head { padding: 12px; border-bottom: 1px solid var(--border); }
@@ -353,6 +357,8 @@ tr.clickable:hover td { background: var(--bg-4); }
 /* mission history */
 .history-item { padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
 .history-item:last-child { border: 0; }
+.history-item.clickable { cursor: pointer; margin: 0 -8px; padding: 8px; border-radius: 6px; }
+.history-item.clickable:hover, .history-item.clickable:focus-visible { background: var(--bg-4); outline: none; }
 
 /* ---------- Toasts / modals -------------------------------------------- */
 .toasts { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 100; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
