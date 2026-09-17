@@ -83,26 +83,38 @@ jobs:
           path: ${{ steps.meta.outputs.zip }}
           if-no-files-found: error
 
-      # Notes are generated only when this job has to create the release itself.
-      # A release made on the GitHub website (or by another OS job that got
-      # there first) keeps whatever notes it already has.
-      - name: Check whether the release already exists
+      # Create the release if this job is the first to reach it (only the
+      # designated job generates notes - see release_notes above - so two
+      # parallel OS jobs racing here don't each write their own copy; a
+      # release made on the GitHub website keeps its own notes either way),
+      # then upload this platform's zip via the gh CLI directly rather than
+      # a third-party action, wrapped in a retry loop: uploads in this size
+      # range (15-35 MB) occasionally hit a transient "Headers Timeout
+      # Error" against the Releases API with no code-level cause - that's
+      # what left v1.0.2's Linux asset missing after everything up to this
+      # point (build, smoke test, artifact upload) had already succeeded.
+      - name: Publish to the GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
-        id: rel
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -e
           TAG="${GITHUB_REF#refs/tags/}"
-          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then EXISTS=true; else EXISTS=false; fi
-          if [ "${{ inputs.release_notes }}" = "true" ] && [ "$EXISTS" = "false" ]; then GEN=true; else GEN=false; fi
-          echo "exists=$EXISTS" >> "$GITHUB_OUTPUT"
-          echo "generate=$GEN" >> "$GITHUB_OUTPUT"
-          echo "release exists: $EXISTS, generate notes: $GEN"
-
-      - name: Attach to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: ${{ steps.meta.outputs.zip }}
-          generate_release_notes: ${{ steps.rel.outputs.generate == 'true' }}
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            if [ "${{ inputs.release_notes }}" = "true" ]; then
+              gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "$TAG" --generate-notes || true
+            else
+              gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "$TAG" --notes "" || true
+            fi
+          fi
+          for attempt in 1 2 3 4; do
+            if gh release upload "$TAG" "${{ steps.meta.outputs.zip }}" --repo "$GITHUB_REPOSITORY" --clobber; then
+              echo "Uploaded ${{ steps.meta.outputs.zip }} on attempt $attempt"
+              exit 0
+            fi
+            echo "::warning::Upload attempt $attempt failed, retrying in $((attempt * 15))s..."
+            sleep $((attempt * 15))
+          done
+          echo "::error::Failed to upload ${{ steps.meta.outputs.zip }} to release $TAG after 4 attempts"
+          exit 1
