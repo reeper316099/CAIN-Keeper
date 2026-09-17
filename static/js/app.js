@@ -11,6 +11,7 @@
      CK.getPath / CK.setPath           dotted-path access into state objects
      CK.bind(root, state, onChange)    two-way binding for [data-bind] inputs
      CK.pips(el, opts)                 clickable pip/segment tracker
+     CK.autosize(el)                   grow a textarea's height to fit its content
      CK.makeSaver(saveFn, delayMs)     debounced autosave (default 500 ms)
      CK.setSaveStatus(state)           header indicator
      CK.reference()                    cached /api/reference data
@@ -143,6 +144,30 @@
     return isNaN(d) ? iso : d.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
   };
 
+  /* ---------- Auto-growing textareas ------------------------------------- */
+
+  /**
+   * Grow `el` (a <textarea>) to exactly fit its content instead of scrolling.
+   * Resetting height to "auto" first lets scrollHeight shrink back down when
+   * text is deleted, not just grow; CSS min-height (style.css) keeps an empty
+   * box from collapsing to a sliver.
+   */
+  CK.autosize = function (el) {
+    if (!el || el.tagName !== "TEXTAREA") return;
+    el.style.height = "auto";
+    // Elements are border-box (see the global "* { box-sizing: border-box }"
+    // reset), so the height we set must include the border scrollHeight
+    // itself doesn't count, or the last couple of pixels of text clip.
+    const cs = getComputedStyle(el);
+    const border = parseFloat(cs.borderTopWidth || 0) + parseFloat(cs.borderBottomWidth || 0);
+    el.style.height = (el.scrollHeight + border) + "px";
+  };
+
+  // Grow while typing. Delegated on the document so it covers every textarea,
+  // including the couple of one-off modal fields that skip data-bind/CK.bind
+  // (see CK.bind below for textareas whose value is set programmatically).
+  document.addEventListener("input", e => { if (e.target.tagName === "TEXTAREA") CK.autosize(e.target); });
+
   /* ---------- State helpers --------------------------------------------- */
 
   CK.getPath = function (obj, path) {
@@ -172,6 +197,7 @@
       if (el.type === "checkbox") el.checked = !!value;
       else if (el.type === "radio") el.checked = String(el.value) === String(value);
       else el.value = value ?? "";
+      if (el.tagName === "TEXTAREA") CK.autosize(el);  // fills from data, not typing, so no "input" event fires
       if (el.dataset.bound) return;
       el.dataset.bound = "1";
       const evt = (el.tagName === "SELECT" || el.type === "checkbox" || el.type === "radio" || el.type === "date") ? "change" : "input";

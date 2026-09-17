@@ -170,7 +170,9 @@
     root.querySelectorAll("[data-roll-skill]").forEach(b => b.addEventListener("click", () => {
       const s = b.dataset.rollSkill;
       Dice.setRoller(ex.identity.name || "Exorcist");
-      Dice.setPool({ skill: ex.skills[s], bonus: 0, hard: false, risky: false, label: s[0].toUpperCase() + s.slice(1) });
+      // The pips are EXTRA dice on top of a base 1, not the total pool: a
+      // skill of 0 still rolls 1d6, a skill of 2 rolls 3d6.
+      Dice.setPool({ skill: ex.skills[s] + 1, bonus: 0, hard: false, risky: false, label: s[0].toUpperCase() + s.slice(1) });
       Dice.open();
     }));
     $("skills-cap").textContent = `${d.skillsAtCap} / 2 skills at 3`;
@@ -251,7 +253,7 @@
     items.innerHTML = ex.kit.items.map((it, i) => `<div class="list-row" style="grid-template-columns: 1fr 64px 1.4fr auto auto">
       <input type="text" data-bind="kit.items.${i}.name" placeholder="Item">
       <input type="number" min="0" data-bind="kit.items.${i}.kp" title="KP cost">
-      <input type="text" data-bind="kit.items.${i}.description" placeholder="Description">
+      <textarea rows="1" data-bind="kit.items.${i}.description" placeholder="Description"></textarea>
       <button class="btn btn-xs" data-use="${i}" title="Spend this item's KP">Pull out</button>
       <button class="btn btn-xs btn-ghost btn-danger rm" data-rm="${i}">✕</button></div>`).join("") || `<div class="hint">No kit items.</div>`;
     CK.bind(items, ex, save);
