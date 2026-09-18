@@ -27,7 +27,16 @@
 }
 
 * { box-sizing: border-box; }
-html, body { height: 100%; }
+/* NOT height: 100%. That clamps html/body to exactly the viewport height
+   regardless of how tall the page's actual content is (a long exorcist
+   sheet easily runs to several times the viewport), which breaks the
+   sidebar and dice panel's "position: sticky" - a sticky element needs
+   its containing block to be able to grow taller than the viewport, or
+   there's no range for it to stick within and it just scrolls away with
+   everything else. .app's own "min-height: 100vh" below already covers
+   the "at least fill the screen on a short page" case; letting html/body
+   size naturally to their content is what a tall page needs on top of
+   that. */
 body {
   margin: 0;
   background: var(--bg);
