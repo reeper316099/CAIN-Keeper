@@ -9,6 +9,11 @@ Result:       dist/CAIN-Keeper/  (one-folder build: the executable plus the
 The data/ folder is NOT bundled. The app creates it next to the executable on
 first launch (see storage.py), so your saves stay outside the build output.
 The GitHub release workflows in .github/workflows use this same spec.
+
+The bundled VERSION file (see updater.py) is what a packaged build reports
+itself as in the in-app update check. The release workflow overwrites it
+with the actual tag before running PyInstaller; the committed placeholder
+here just means a manual local build never fails on a missing file.
 """
 
 from PyInstaller.utils.hooks import collect_submodules
@@ -32,7 +37,7 @@ a = Analysis(
     ["main.py"],
     pathex=["."],
     binaries=[],
-    datas=[("templates", "templates"), ("static", "static")],
+    datas=[("templates", "templates"), ("static", "static"), ("VERSION", ".")],
     hiddenimports=hiddenimports,
     hookspath=[],
     runtime_hooks=[],

@@ -63,6 +63,32 @@ git push origin v1.0.0
 To build locally instead: `pip install pyinstaller && pyinstaller cain_keeper.spec`
 (output in `dist/CAIN-Keeper/`, verified by `python scripts/smoke_test.py`).
 
+## Checking for updates
+
+The sidebar footer checks GitHub once, quietly, when the server starts (best
+effort - this app is meant to work fully offline at a table with no wifi, so
+a failed or slow check never blocks startup or shows an error). If a newer
+release exists it shows an "Update available" badge; click it, or "Check for
+updates" any time, to see what's new and update.
+
+How updating works depends on how you got the app:
+
+- **Packaged download**: you get a direct link to the matching zip for your
+  platform on the new release. Unzip it over (or alongside) your current copy
+  and relaunch - your `data/` folder lives next to the program, untouched by
+  this.
+- **Running from source (a git checkout)**: an "Update now" button runs
+  `git pull --ff-only` for you and reports the result. It never rewrites
+  history or force-merges - if your checkout has diverged (local commits, a
+  dirty tree conflicting with upstream), the pull just fails with git's own
+  message so you can sort it out yourself. Restart the server afterward to
+  pick up the change.
+- **Source without git** (e.g. a downloaded source zip): you get a link to
+  the repository to grab the update manually.
+
+This only ever reads your version and GitHub's latest release tag - nothing
+is downloaded or changed on your machine without you clicking a button.
+
 ## Layout of the project
 
 | File / folder | Purpose |
@@ -71,6 +97,8 @@ To build locally instead: `pip install pyinstaller && pyinstaller cain_keeper.sp
 | `storage.py` | The only module that touches disk. Atomic JSON writes, one lock per file. |
 | `models.py` | Default shape of every document plus sheet constants (skills, GM moves, Blast, kit). |
 | `dice.py` | Dice engine. Pure functions, no I/O. |
+| `updater.py` | Checks GitHub for a newer release; `git pull` for source installs. |
+| `VERSION` | This build's version, read by `updater.py`. Overwritten at build time for packaged builds (see the release workflow); ignored entirely when running from source, which uses `git describe` instead. |
 | `templates/` | Jinja2 pages. `base.html` holds the sidebar and the dice panel. |
 | `static/js/app.js` | Shared helpers: API wrapper, two-way binding, pip trackers, debounced autosave. |
 | `static/js/dice.js` | The dice panel. |
