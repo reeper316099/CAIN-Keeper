@@ -49,6 +49,20 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt pyinstaller
 
+      # Computed before the build so it can be baked into the VERSION file
+      # PyInstaller bundles (see cain_keeper.spec, updater.py): a packaged
+      # build's in-app update check reads this back to know its own
+      # version, so it must reflect the actual tag being built, not
+      # whatever the committed placeholder file says.
+      - name: Work out the version
+        id: meta
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then VERSION="${GITHUB_REF#refs/tags/}"; else VERSION="dev-${GITHUB_SHA::7}"; fi
+          echo "$VERSION" > VERSION
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "zip=CAIN-Keeper-${VERSION}-${{ inputs.label }}.zip" >> "$GITHUB_OUTPUT"
+
       - name: Build with PyInstaller
         run: pyinstaller --noconfirm --clean cain_keeper.spec
 
@@ -57,13 +71,6 @@ jobs:
         run: |
           if [ "$RUNNER_OS" = "Windows" ]; then EXE=dist/CAIN-Keeper/CAIN-Keeper.exe; else EXE=dist/CAIN-Keeper/CAIN-Keeper; fi
           python scripts/smoke_test.py "$EXE"
-
-      - name: Work out the zip name
-        id: meta
-        shell: bash
-        run: |
-          if [[ "$GITHUB_REF" == refs/tags/* ]]; then VERSION="${GITHUB_REF#refs/tags/}"; else VERSION="dev-${GITHUB_SHA::7}"; fi
-          echo "zip=CAIN-Keeper-${VERSION}-${{ inputs.label }}.zip" >> "$GITHUB_OUTPUT"
 
       - name: Package
         shell: bash

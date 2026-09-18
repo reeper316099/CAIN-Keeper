@@ -62,6 +62,7 @@ from fastapi.templating import Jinja2Templates
 import dice
 import models
 import storage
+import updater
 
 # Templates and static files: next to this file from source, or inside the
 # PyInstaller bundle (sys._MEIPASS) when running as a packaged executable.
@@ -485,6 +486,44 @@ def api_save_library(payload: dict = Body(...)):
 
 
 # --------------------------------------------------------------------------
+# API: update check
+# --------------------------------------------------------------------------
+#
+# A background thread does one network check at startup (see main()) and
+# caches the result here, so GET /api/update - called once by the sidebar
+# on every page load - never itself makes a network call and is instant
+# even fully offline. The explicit "Check now" action hits GitHub directly
+# and is allowed to block briefly, since the user asked for it.
+
+_update_cache: dict[str, Any] | None = None
+
+
+@app.get("/api/update")
+def api_update_status():
+    """Cheap, local, no network call: whatever the startup check found (or
+    just the always-available local facts, if that check hasn't finished
+    or hasn't run yet)."""
+    return _update_cache or updater.check(force_network=False)
+
+
+@app.post("/api/update/refresh")
+def api_update_refresh():
+    """Explicit "Check now": a fresh network check, blocking, caching the
+    result for subsequent GET /api/update calls too."""
+    global _update_cache
+    _update_cache = updater.check(force_network=True)
+    return _update_cache
+
+
+@app.post("/api/update/git-pull")
+def api_update_git_pull():
+    """Update a source checkout in place. No-op-safe on a packaged build
+    or a non-git source tree - updater.git_pull() reports why rather than
+    failing oddly."""
+    return updater.git_pull()
+
+
+# --------------------------------------------------------------------------
 # Error pages
 # --------------------------------------------------------------------------
 
@@ -525,6 +564,17 @@ def main() -> None:
     args = parser.parse_args()
 
     storage.load_library()  # seeds blasphemy_library.json on first run
+
+    def _check_for_update_in_background() -> None:
+        # One best-effort network call, off the main thread, so a slow or
+        # absent connection (this app is meant to work fully offline at a
+        # table with no wifi) never delays startup. Silent on any failure -
+        # see updater.check()'s "checked" field.
+        global _update_cache
+        _update_cache = updater.check(force_network=True)
+
+    threading.Thread(target=_check_for_update_in_background, daemon=True).start()
+
     url = f"http://{args.host}:{args.port}"
     # A double-clicked packaged executable should just open the app.
     open_browser = (args.open or storage.FROZEN) and not args.no_open

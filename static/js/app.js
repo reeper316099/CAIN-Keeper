@@ -364,4 +364,84 @@
       onOpen: m => m.querySelector("#nc-name").focus(),
     });
   };
+
+  /* ---------- Update check -------------------------------------------- */
+  // GET /api/update is cheap and local (a background thread already did the
+  // one network call at server startup - see main.py), so it's safe to call
+  // on every page load without adding a network round trip to page loads.
+  // The badge only ever appears when an update was actually confirmed
+  // found; "Check for updates" is the always-visible manual trigger.
+
+  /** Render the "how to update" modal for a given /api/update status object. */
+  function showUpdateModal(status) {
+    const rows = [`<div class="hint">Running: <span class="mono">${CK.esc(status.current)}</span>${status.latest ? ` · Latest: <span class="mono">${CK.esc(status.latest)}</span>` : ""}</div>`];
+    if (!status.checked) {
+      rows.push(`<p>Couldn't reach GitHub to check for a newer version. If you're offline (fine - this app works fully offline), just try again once you have a connection.</p>`);
+    } else if (!status.update_available) {
+      rows.push(`<p class="hint">You're up to date.</p>`);
+    } else if (status.method === "download") {
+      rows.push(`<p>A new version is available as a packaged download.</p>
+        <div class="hint">Unzip it over (or alongside) your current copy and relaunch. Your saves live in <span class="mono">data/</span>, next to the program, and are untouched by this.</div>`);
+    } else if (status.method === "git_pull") {
+      rows.push(`<p>A new version is available. This is a git checkout, so it can update itself in place.</p>
+        <div id="update-pull-result"></div>`);
+    } else {
+      rows.push(`<p>A new version is available. This doesn't look like a git checkout, so grab the updated source from the repository.</p>`);
+    }
+    const buttons = [{ label: "Close" }];
+    if (status.checked && status.update_available) {
+      if (status.method === "download") {
+        buttons.unshift({ label: "Download", cls: "btn-accent", close: false, onClick: () => {
+          window.open(status.asset_url || status.release_url, "_blank");
+        } });
+      } else if (status.method === "git_pull") {
+        buttons.unshift({ label: "Update now (git pull)", cls: "btn-accent", close: false, onClick: async (m) => {
+          const box = m.querySelector("#update-pull-result");
+          box.innerHTML = `<span class="hint">Pulling…</span>`;
+          const r = await CK.api("POST", "/api/update/git-pull");
+          if (r.ok) {
+            box.innerHTML = `<div class="hint accent">Updated. Restart the server (stop it and run setup again, or python main.py) to pick it up.</div><pre class="mono" style="white-space:pre-wrap;font-size:11px">${CK.esc(r.output)}</pre>`;
+            CK.toast("Pulled the latest changes - restart the server to apply them", "ok");
+          } else {
+            box.innerHTML = `<div class="hint accent">Couldn't update automatically:</div><pre class="mono" style="white-space:pre-wrap;font-size:11px">${CK.esc(r.output)}</pre>`;
+          }
+        } });
+      }
+      buttons.push({ label: "View release", onClick: () => window.open(status.release_url, "_blank") });
+    }
+    CK.modal({ title: "Update", body: `<div class="stack">${rows.join("")}</div>`, buttons });
+  }
+
+  function renderUpdateBadge(status) {
+    const badge = document.getElementById("update-badge");
+    if (!badge) return;
+    if (status.checked && status.update_available) {
+      badge.hidden = false;
+      badge.textContent = `Update available: ${status.latest}`;
+      badge.onclick = () => showUpdateModal(status);
+    } else {
+      badge.hidden = true;
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    CK.api("GET", "/api/update", undefined, { quiet: true }).then(renderUpdateBadge).catch(() => {});
+    const checkLink = document.getElementById("check-update-link");
+    if (checkLink) {
+      checkLink.addEventListener("click", async e => {
+        e.preventDefault();
+        const original = checkLink.textContent;
+        checkLink.textContent = "Checking…";
+        try {
+          const status = await CK.api("POST", "/api/update/refresh", undefined, { quiet: true });
+          renderUpdateBadge(status);
+          showUpdateModal(status);
+        } catch (_) {
+          CK.toast("Couldn't check for updates", "error");
+        } finally {
+          checkLink.textContent = original;
+        }
+      });
+    }
+  });
 })();
