@@ -1,0 +1,6 @@
+#!/bin/bash
+# Entry point every AppImage runtime calls. Just hands off to the real
+# executable PyInstaller built, from wherever the AppImage happened to be
+# mounted/extracted, so relative-path assumptions never bite.
+HERE="$(dirname "$(readlink -f "${0}")")"
+exec "$HERE/usr/bin/CAIN-Keeper" "$@"

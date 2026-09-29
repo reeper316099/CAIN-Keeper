@@ -2,12 +2,18 @@
 # (release-linux.yml, release-macos.yml, release-windows.yml).
 #
 # What it does on the requested runner:
-#   1. install Python + requirements + PyInstaller
-#   2. build dist/CAIN-Keeper/ from cain_keeper.spec
+#   1. install Python + requirements + PyInstaller (+ system GTK/WebKit
+#      dev libraries on Linux, needed to build pywebview's native window)
+#   2. build dist/CAIN-Keeper/ from cain_keeper.spec (also produces
+#      dist/CAIN Keeper.app on macOS, via the spec's BUNDLE() step)
 #   3. run scripts/smoke_test.py against the built executable
 #   4. zip it up (with README + LICENSE) and upload it as a workflow artifact
-#   5. on a v* tag, attach the zip to the GitHub Release for that tag
-#      (creating it, with generated notes, only if it doesn't exist yet)
+#      - the portable, no-installer distribution, unchanged since v1.0
+#   5. build a real per-OS installer from the same build and upload that too:
+#      an Inno Setup .exe on Windows, a .dmg on macOS, an AppImage on Linux
+#   6. on a v* tag, attach both the zip and the installer to the GitHub
+#      Release for that tag (creating it, with generated notes, only if it
+#      doesn't exist yet)
 name: Build package
 
 on:
@@ -44,6 +50,21 @@ jobs:
           python-version: "3.12"
           cache: pip
 
+      # pywebview's Linux backend is PyGObject (GTK3 + WebKitGTK), which
+      # unlike its Windows/macOS backends isn't pulled in as a prebuilt
+      # wheel - it compiles against these system dev libraries (see
+      # requirements.txt). The non-dev runtime packages are also listed
+      # explicitly, rather than relying on the dev packages' dependencies,
+      # since it's the runtime libraries the built app actually loads.
+      - name: Install Linux GTK/WebKit build + runtime dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgirepository-2.0-dev libgirepository1.0-dev pkg-config python3-dev libcairo2-dev \
+            libgtk-3-dev libwebkit2gtk-4.1-dev libgtk-3-0 libwebkit2gtk-4.1-0 \
+            gir1.2-gtk-3.0 gir1.2-webkit2-4.1
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -62,6 +83,11 @@ jobs:
           echo "$VERSION" > VERSION
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "zip=CAIN-Keeper-${VERSION}-${{ inputs.label }}.zip" >> "$GITHUB_OUTPUT"
+          case "$RUNNER_OS" in
+            Windows) echo "installer=CAIN-Keeper-Setup-${VERSION}-${{ inputs.label }}.exe" >> "$GITHUB_OUTPUT" ;;
+            macOS)   echo "installer=CAIN-Keeper-${VERSION}-${{ inputs.label }}.dmg" >> "$GITHUB_OUTPUT" ;;
+            *)       echo "installer=CAIN-Keeper-${VERSION}-${{ inputs.label }}.AppImage" >> "$GITHUB_OUTPUT" ;;
+          esac
 
       - name: Build with PyInstaller
         run: pyinstaller --noconfirm --clean cain_keeper.spec
@@ -90,16 +116,82 @@ jobs:
           path: ${{ steps.meta.outputs.zip }}
           if-no-files-found: error
 
+      # A real per-OS installer built from the exact same dist/ output the
+      # zip above was made from and already smoke-tested. Each platform
+      # uses whatever installer tooling its runner ships with, so there's
+      # nothing extra to install beyond the Linux GTK/WebKit step above:
+      # Inno Setup comes preinstalled on windows-latest, hdiutil is part of
+      # macOS, and appimagetool is a single self-contained download.
+      - name: Install Inno Setup
+        if: runner.os == 'Windows'
+        run: choco install innosetup --no-progress -y
+
+      - name: Build installer
+        id: installer
+        shell: bash
+        run: |
+          case "$RUNNER_OS" in
+            Windows)
+              # ISCC always appends .exe to OutputBaseFilename itself, so pass
+              # it the name with that extension already stripped.
+              BASE="${{ steps.meta.outputs.installer }}"
+              BASE="${BASE%.exe}"
+              ISCC="/c/Program Files (x86)/Inno Setup 6/ISCC.exe"
+              [ -f "$ISCC" ] || ISCC="/c/Program Files/Inno Setup 6/ISCC.exe"
+              "$ISCC" //DMyAppVersion="${{ steps.meta.outputs.version }}" \
+                //DSourceDir="${{ github.workspace }}\\dist\\CAIN-Keeper" //DOutputDir="${{ github.workspace }}\\dist" \
+                //DMyOutputBaseName="$BASE" installer/windows.iss
+              ;;
+            macOS)
+              mkdir -p dist/dmg-src
+              cp -R "dist/CAIN Keeper.app" dist/dmg-src/
+              ln -s /Applications dist/dmg-src/Applications
+              hdiutil create -volname "CAIN Keeper" -srcfolder dist/dmg-src -ov -format UDZO \
+                "dist/${{ steps.meta.outputs.installer }}"
+              ;;
+            *)
+              APPDIR=dist/CAIN-Keeper.AppDir
+              mkdir -p "$APPDIR/usr/bin"
+              cp -R dist/CAIN-Keeper/* "$APPDIR/usr/bin/"
+              cp installer/appimage/AppRun "$APPDIR/AppRun"
+              chmod +x "$APPDIR/AppRun"
+              cp installer/appimage/cain-keeper.desktop "$APPDIR/cain-keeper.desktop"
+              cp assets/icons/icon.png "$APPDIR/cain-keeper.png"
+              ln -s cain-keeper.png "$APPDIR/.DirIcon"
+              curl -fL -o appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+              chmod +x appimagetool
+              ./appimagetool --appimage-extract-and-run "$APPDIR" "dist/${{ steps.meta.outputs.installer }}"
+              ;;
+          esac
+          ls -la "dist/${{ steps.meta.outputs.installer }}"
+
+      - name: Smoke test the installer's contents
+        shell: bash
+        run: |
+          # The installer itself isn't run headless (installing/mounting
+          # varies too much per OS to be worth automating here) - this just
+          # confirms the build step actually produced a non-empty file
+          # rather than silently no-op'ing, which "ls" above wouldn't catch
+          # if e.g. hdiutil printed a warning but exited 0.
+          test -s "dist/${{ steps.meta.outputs.installer }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.installer }}
+          path: dist/${{ steps.meta.outputs.installer }}
+          if-no-files-found: error
+
       # Create the release if this job is the first to reach it (only the
       # designated job generates notes - see release_notes above - so two
       # parallel OS jobs racing here don't each write their own copy; a
       # release made on the GitHub website keeps its own notes either way),
-      # then upload this platform's zip via the gh CLI directly rather than
-      # a third-party action, wrapped in a retry loop: uploads in this size
-      # range (15-35 MB) occasionally hit a transient "Headers Timeout
-      # Error" against the Releases API with no code-level cause - that's
-      # what left v1.0.2's Linux asset missing after everything up to this
-      # point (build, smoke test, artifact upload) had already succeeded.
+      # then upload this platform's zip AND installer via the gh CLI
+      # directly rather than a third-party action, each wrapped in its own
+      # retry loop: uploads in this size range (15-35 MB) occasionally hit a
+      # transient "Headers Timeout Error" against the Releases API with no
+      # code-level cause - that's what left v1.0.2's Linux asset missing
+      # after everything up to this point (build, smoke test, artifact
+      # upload) had already succeeded.
       - name: Publish to the GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         shell: bash
@@ -115,13 +207,20 @@ jobs:
               gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "$TAG" --notes "" || true
             fi
           fi
-          for attempt in 1 2 3 4; do
-            if gh release upload "$TAG" "${{ steps.meta.outputs.zip }}" --repo "$GITHUB_REPOSITORY" --clobber; then
-              echo "Uploaded ${{ steps.meta.outputs.zip }} on attempt $attempt"
-              exit 0
-            fi
-            echo "::warning::Upload attempt $attempt failed, retrying in $((attempt * 15))s..."
-            sleep $((attempt * 15))
-          done
-          echo "::error::Failed to upload ${{ steps.meta.outputs.zip }} to release $TAG after 4 attempts"
-          exit 1
+
+          upload_with_retry() {
+            local file="$1"
+            for attempt in 1 2 3 4; do
+              if gh release upload "$TAG" "$file" --repo "$GITHUB_REPOSITORY" --clobber; then
+                echo "Uploaded $file on attempt $attempt"
+                return 0
+              fi
+              echo "::warning::Upload attempt $attempt for $file failed, retrying in $((attempt * 15))s..."
+              sleep $((attempt * 15))
+            done
+            echo "::error::Failed to upload $file to release $TAG after 4 attempts"
+            return 1
+          }
+
+          upload_with_retry "${{ steps.meta.outputs.zip }}"
+          upload_with_retry "dist/${{ steps.meta.outputs.installer }}"

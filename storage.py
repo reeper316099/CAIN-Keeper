@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import json
 import os
+import platform
 import shutil
 import sys
 import tempfile
@@ -49,11 +50,70 @@ import models
 
 # When running from source, everything lives next to this file. When running
 # as a packaged executable (PyInstaller, see cain_keeper.spec) the bundled
-# templates/static are unpacked to a temp folder, but the *data* folder must
-# live next to the executable so saves survive between launches.
+# templates/static are unpacked to a temp folder, but the *data* folder
+# defaults to next to the executable so saves survive between launches -
+# UNLESS this is an OS-installed app (see IS_INSTALLED_APP below), where
+# that location is either not writable by a normal user or gets wiped
+# outright on every update, and a stable per-user app-data folder is used
+# instead.
 FROZEN = getattr(sys, "frozen", False)
 BASE_DIR = Path(sys.executable).resolve().parent if FROZEN else Path(__file__).resolve().parent
-DATA_DIR = Path(os.environ.get("CAIN_KEEPER_DATA", BASE_DIR / "data")).resolve()
+
+
+def _is_installed_app() -> bool:
+    """
+    Whether this running instance is a proper OS-installed app (Windows
+    Program Files, a macOS .app bundle, a Linux AppImage) rather than the
+    portable zip extracted wherever the user picked.
+
+    Each check is a direct, reliable signal of how that install method
+    actually runs, not a guess:
+      Windows: the Inno Setup installer's own default install location.
+      macOS: a .app bundle's executable always sits at
+             "<Name>.app/Contents/MacOS/<exe>" - the zip's raw executable
+             (see cain_keeper.spec's COLLECT vs. BUNDLE) never does.
+      Linux: the AppImage runtime always sets $APPIMAGE to the mounted
+             image's own path before running anything inside it.
+
+    Why this matters: an installed app's executable directory is either
+    not user-writable (Program Files needs admin) or gets replaced/deleted
+    wholesale on every update (a new .app dragged over the old one, a new
+    AppImage file replacing the old one, whose read-only mount vanishes
+    the moment it's replaced anyway) - so "data/ next to the executable",
+    which is exactly right for the portable zip, would silently fail to
+    save or lose every campaign on the very next update if used here too.
+    """
+    if not FROZEN:
+        return False
+    exe = str(Path(sys.executable).resolve()).lower()
+    system = platform.system()
+    if system == "Windows":
+        return "program files" in exe
+    if system == "Darwin":
+        return "/contents/macos/" in exe
+    if system == "Linux":
+        return bool(os.environ.get("APPIMAGE"))
+    return False
+
+
+IS_INSTALLED_APP = _is_installed_app()
+
+
+def _default_data_dir() -> Path:
+    if IS_INSTALLED_APP:
+        system = platform.system()
+        if system == "Windows":
+            base = Path(os.environ.get("APPDATA") or (Path.home() / "AppData" / "Roaming"))
+            return base / "CAIN Keeper"
+        if system == "Darwin":
+            return Path.home() / "Library" / "Application Support" / "CAIN Keeper"
+        if system == "Linux":
+            base = Path(os.environ.get("XDG_DATA_HOME") or (Path.home() / ".local" / "share"))
+            return base / "CAIN Keeper"
+    return BASE_DIR / "data"
+
+
+DATA_DIR = Path(os.environ.get("CAIN_KEEPER_DATA", str(_default_data_dir()))).resolve()
 CAMPAIGNS_DIR = DATA_DIR / "campaigns"
 LIBRARY_FILE = DATA_DIR / "blasphemy_library.json"
 

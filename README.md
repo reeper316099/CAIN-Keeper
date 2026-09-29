@@ -3,7 +3,8 @@
 A local web app for running the tabletop RPG **CAIN**: exorcist character
 sheets, sin sheets, a GM mission/session tracker, a shared Blasphemy Library,
 the CAT reference table and a dice roller that is always one click away.
-It replaces the printed 1.4.5 sheets and runs identically on Windows and macOS.
+It replaces the printed 1.4.5 sheets and runs identically on Windows, macOS
+and Linux, as a real installed app or from source.
 
 Everything is stored as plain JSON files under `data/`. No database, no
 accounts, no internet required once installed.
@@ -25,6 +26,7 @@ To start the server by hand once the environment exists:
 ```
 python main.py            # serve only
 python main.py --open     # serve and open the browser
+python main.py --native   # serve and open a native app window instead (needs pywebview - see below)
 python main.py --port 9000
 ```
 
@@ -32,28 +34,45 @@ python main.py --port 9000
 
 Every push to `main` builds a standalone package for each platform with
 PyInstaller; download it from the workflow run's artifacts. Pushing a tag such
-as `v1.0.0` attaches the three zips to a GitHub Release:
+as `v1.0.0` attaches two things per platform to a GitHub Release: the
+portable zip (unzip and run, no installation) and a real installer.
 
-| Workflow | Runner | Archive |
-| --- | --- | --- |
-| `Package · Windows` | windows-latest | `CAIN-Keeper-<version>-windows-x64.zip` |
-| `Package · macOS` | macos-latest (Apple Silicon) | `CAIN-Keeper-<version>-macos-arm64.zip` |
-| `Package · Linux` | ubuntu-latest | `CAIN-Keeper-<version>-linux-x64.zip` |
+| Workflow | Runner | Zip | Installer |
+| --- | --- | --- | --- |
+| `Package · Windows` | windows-latest | `CAIN-Keeper-<version>-windows-x64.zip` | `CAIN-Keeper-Setup-<version>-windows-x64.exe` |
+| `Package · macOS` | macos-latest (Apple Silicon) | `CAIN-Keeper-<version>-macos-arm64.zip` | `CAIN-Keeper-<version>-macos-arm64.dmg` |
+| `Package · Linux` | ubuntu-latest | `CAIN-Keeper-<version>-linux-x64.zip` | `CAIN-Keeper-<version>-linux-x64.AppImage` |
 
-Unzip, then run `CAIN-Keeper.exe` (Windows) or `./CAIN-Keeper` (macOS/Linux).
-The app opens your browser automatically and creates its `data/` folder next
-to the executable. Pass `--no-open` to skip the browser, `--port 9000` to
-change the port, or set `CAIN_KEEPER_DATA=/some/folder` to keep saves
-elsewhere.
+Either way you get the same app. The installer puts a normal Start Menu /
+Applications / desktop-launcher entry in place (Inno Setup on Windows, a
+`.dmg` you drag to Applications on macOS, an AppImage on Linux); the zip is
+the no-install, no-admin-rights, portable alternative it's always been -
+unzip it anywhere and run the executable inside. **Both open as a real app
+window now**, not a browser tab: CAIN Keeper runs its usual local server
+underneath, but shows it in a native window (WebView2 on Windows, WKWebView
+on macOS, WebKitGTK on Linux) via [pywebview](https://pywebview.flowrl.com/).
+Pass `--browser` to force the old browser-tab behaviour, `--no-open` to skip
+opening anything, `--port 9000` to change the port, or set
+`CAIN_KEEPER_DATA=/some/folder` to keep saves elsewhere.
+
+**Linux native window caveat**: unlike Windows and macOS, Linux has no
+universal built-in webview engine. The AppImage and zip both need
+`libwebkit2gtk-4.1-0` and GTK3 already on your system to open as a window
+(`sudo apt install libwebkit2gtk-4.1-0 gir1.2-webkit2-4.1` on
+Debian/Ubuntu, or the equivalent for your distro - most GNOME-based desktops
+already have this via apps like GNOME Web or Evolution). If it's missing,
+CAIN Keeper notices and falls back to serving in your terminal and opening a
+browser tab instead, exactly like before - it never just fails to start.
 
 The builds are not code-signed. macOS will quarantine the download; clear it
-once with `xattr -dr com.apple.quarantine CAIN-Keeper` (or right-click →
-Open). Windows SmartScreen may ask you to confirm the first launch.
+once with `xattr -dr com.apple.quarantine "CAIN Keeper.app"` (or right-click
+→ Open). Windows SmartScreen may ask you to confirm the first launch, for
+both the zip's `.exe` and the installer.
 
 To cut a release, either publish one on the GitHub website with a new `v*`
-tag (your title and notes are kept; the zips are attached a couple of minutes
-later), or push a tag from the command line and let the Linux workflow create
-the release with generated notes:
+tag (your title and notes are kept; the zips and installers are attached a
+couple of minutes later), or push a tag from the command line and let the
+Linux workflow create the release with generated notes:
 
 ```
 git tag v1.0.0
@@ -61,7 +80,10 @@ git push origin v1.0.0
 ```
 
 To build locally instead: `pip install pyinstaller && pyinstaller cain_keeper.spec`
-(output in `dist/CAIN-Keeper/`, verified by `python scripts/smoke_test.py`).
+(output in `dist/CAIN-Keeper/`, plus `dist/CAIN Keeper.app` on macOS, verified
+by `python scripts/smoke_test.py`). The installers themselves are built by
+`.github/workflows/build-package.yml` using each OS's own tooling (Inno
+Setup, `hdiutil`, `appimagetool`) - see `installer/` for the source files.
 
 ## Checking for updates
 
@@ -105,7 +127,10 @@ is downloaded or changed on your machine without you clicking a button.
 | `static/js/exorcist.js`, `sin.js`, `mission.js`, `library.js` | One script per sheet. |
 | `static/css/style.css` | Dark theme, single accent colour. |
 | `data/` | Your saves (see below). |
-| `cain_keeper.spec` | PyInstaller build recipe used by the release workflows. |
+| `cain_keeper.spec` | PyInstaller build recipe used by the release workflows; also builds the macOS `.app` bundle. |
+| `assets/icons/` | The app icon in every format the builds need (`.ico`, `.icns`, `.png`); regenerate with `scripts/generate_icons.py`. |
+| `installer/windows.iss` | Inno Setup script for the Windows installer. |
+| `installer/appimage/` | `AppRun` + `.desktop` file used to build the Linux AppImage. |
 | `scripts/smoke_test.py` | Starts a packaged build and checks it answers. |
 | `.github/workflows/` | Per-OS package workflows plus the shared build job. |
 

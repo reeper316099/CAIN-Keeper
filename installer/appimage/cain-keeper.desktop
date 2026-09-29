@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=CAIN Keeper
+Comment=Character sheets, GM tools and dice roller for the tabletop RPG CAIN
+Exec=CAIN-Keeper
+Icon=cain-keeper
+Categories=Game;RolePlaying;
+Terminal=false
