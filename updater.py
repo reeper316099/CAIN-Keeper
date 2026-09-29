@@ -4,7 +4,11 @@ tailored to how this copy of CAIN Keeper is currently running.
 
 Two install methods, two update paths:
   * Packaged build (the PyInstaller executable from a GitHub Release):
-    points at the matching platform's zip on the latest release.
+    points at the matching asset on the latest release - specifically the
+    same KIND of asset this copy was installed from (see _install_kind()):
+    the portable zip if you unzipped one, the platform installer (.exe
+    Inno Setup / .dmg / .AppImage - see build-package.yml) if you used one
+    of those, since each release now has both per platform.
   * Running from source (a git checkout): can update itself in place with
     a plain `git pull`. An unzipped source tree with no .git just gets
     pointed at the repository to update manually.
@@ -118,13 +122,50 @@ def fetch_latest_release(timeout: float = 4.0) -> dict[str, Any] | None:
     return {"tag": data.get("tag_name", ""), "url": data.get("html_url") or RELEASES_PAGE, "assets": assets}
 
 
+def _install_kind() -> str:
+    """
+    "installer" or "portable" - which kind of packaged build this running
+    instance actually is, so an update points at the same kind rather than
+    an arbitrary pick between the two assets every release now has per
+    platform. See storage.IS_INSTALLED_APP for how this is detected - the
+    same signal that decides where data/ lives, since a Program
+    Files / .app bundle / AppImage install needs both handled consistently.
+    """
+    return "installer" if storage.IS_INSTALLED_APP else "portable"
+
+
+#: Which asset extension each install kind downloads, per OS - matches the
+#: filenames build-package.yml actually produces.
+_KIND_EXTENSION = {
+    ("Windows", "installer"): ".exe",
+    ("Windows", "portable"): ".zip",
+    ("Darwin", "installer"): ".dmg",
+    ("Darwin", "portable"): ".zip",
+    ("Linux", "installer"): ".AppImage",
+    ("Linux", "portable"): ".zip",
+}
+
+
 def _asset_for_this_platform(assets: list[dict[str, str]]) -> dict[str, str] | None:
-    """Match a release asset to the OS this instance is actually running
-    on, using the same *-x64/*-arm64 naming the release workflow uses."""
-    needle = {"Windows": "windows-x64", "Darwin": "macos-arm64", "Linux": "linux-x64"}.get(platform.system())
+    """
+    Match a release asset to the OS this instance is actually running on
+    (the same *-x64/*-arm64 naming the release workflow uses), preferring
+    the same install kind (installer vs. portable zip - see
+    _install_kind()) this copy is currently running as. Falls back to
+    whatever matches the platform if that exact kind isn't found - an
+    older release made before installers existed, for instance.
+    """
+    system = platform.system()
+    needle = {"Windows": "windows-x64", "Darwin": "macos-arm64", "Linux": "linux-x64"}.get(system)
     if not needle:
         return None
-    return next((a for a in assets if needle in a["name"]), None)
+    matches = [a for a in assets if needle in a["name"]]
+    ext = _KIND_EXTENSION.get((system, _install_kind()))
+    if ext:
+        preferred = next((a for a in matches if a["name"].lower().endswith(ext.lower())), None)
+        if preferred:
+            return preferred
+    return matches[0] if matches else None
 
 
 def check(force_network: bool = True) -> dict[str, Any]:
@@ -140,7 +181,10 @@ def check(force_network: bool = True) -> dict[str, Any]:
                            and the release is actually newer
         method            "download" | "git_pull" | "manual" - which update
                            path applies to this install
-        asset_url         this platform's zip, when method is "download"
+        asset_url         the matching release asset, when method is "download"
+        install_kind      "installer" | "portable" - which kind of packaged
+                           build this is (see _install_kind()); asset_url
+                           points at that same kind on the new release
         git_available     whether BASE_DIR is a git checkout (method "git_pull")
     """
     current = get_current_version()
@@ -154,6 +198,7 @@ def check(force_network: bool = True) -> dict[str, Any]:
         "update_available": False,
         "method": "download" if storage.FROZEN else ("git_pull" if is_git else "manual"),
         "asset_url": None,
+        "install_kind": _install_kind() if storage.FROZEN else None,
         "git_available": is_git,
     }
     if not force_network:

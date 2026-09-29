@@ -380,8 +380,11 @@
     } else if (!status.update_available) {
       rows.push(`<p class="hint">You're up to date.</p>`);
     } else if (status.method === "download") {
-      rows.push(`<p>A new version is available as a packaged download.</p>
-        <div class="hint">Unzip it over (or alongside) your current copy and relaunch. Your saves live in <span class="mono">data/</span>, next to the program, and are untouched by this.</div>`);
+      const howTo = status.install_kind === "installer"
+        ? "Run the installer, same as the first time - it installs over your current copy."
+        : "Unzip it over (or alongside) your current copy and relaunch.";
+      rows.push(`<p>A new version is available as a packaged download${status.install_kind === "installer" ? " (installer)" : status.install_kind === "portable" ? " (portable zip)" : ""}.</p>
+        <div class="hint">${howTo} Your saves live in <span class="mono">data/</span>, next to the program, and are untouched by this.</div>`);
     } else if (status.method === "git_pull") {
       rows.push(`<p>A new version is available. This is a git checkout, so it can update itself in place.</p>
         <div id="update-pull-result"></div>`);

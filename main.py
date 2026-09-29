@@ -45,6 +45,7 @@ atomic writes, so there's no partial-update logic to maintain.
 from __future__ import annotations
 
 import argparse
+import os
 import socket
 import sys
 import threading
@@ -554,12 +555,75 @@ def _open_browser_when_ready(url: str, host: str, port: int, timeout: float = 20
     webbrowser.open(url)
 
 
+def _port_in_use(host: str, port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(0.5)
+        return s.connect_ex((host, port)) == 0
+
+
+def _native_mode_possible() -> bool:
+    """
+    Whether it's even worth trying to create a native window.
+
+    On Linux, GTK's Gtk.init() (which pywebview's GTK backend calls) hard-
+    exits the whole process with no catchable exception if it can't open a
+    display - unlike a normal import failure, main()'s try/except around
+    _run_native_window() can't recover from that. So check for a display
+    here, before ever importing webview, on a machine with no X/Wayland
+    session (a CI runner, a headless server, an SSH-only box).
+    """
+    if sys.platform.startswith("linux"):
+        return bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
+    return True
+
+
+def _run_native_window(url: str, host: str, port: int) -> None:
+    """
+    Show the app in a real desktop window (pywebview) instead of a browser
+    tab: WebView2 on Windows, WKWebView on macOS, WebKitGTK on Linux.
+
+    Raises on any failure to create the window (missing pywebview, or on
+    Linux a missing system WebKitGTK) so the caller can fall back to opening
+    a browser tab instead - this is a nice-to-have, never something that
+    should leave the app unusable.
+    """
+    import webview  # imported lazily: only required when native mode runs
+
+    server = None
+    if not _port_in_use(host, port):
+        # Normal case: nothing is listening yet, so run the server ourselves
+        # in a background thread. If something IS already listening (a
+        # second launch, or a dev server left running on the same port), a
+        # window pointed at the existing instance is more useful than an
+        # address-already-in-use crash.
+        config = uvicorn.Config(app, host=host, port=port, log_level="warning")
+        server = uvicorn.Server(config)
+        threading.Thread(target=server.run, daemon=True).start()
+        deadline = time.time() + 20.0
+        while time.time() < deadline and not _port_in_use(host, port):
+            time.sleep(0.1)
+
+    icon_path = RESOURCE_DIR / "assets" / "icons" / "icon.png"
+    webview.create_window("CAIN Keeper", url, width=1280, height=860, min_size=(900, 600))
+    try:
+        webview.start(icon=str(icon_path) if icon_path.exists() else None)
+    except TypeError:
+        # Older pywebview releases don't accept icon= on this backend.
+        webview.start()
+    if server is not None:
+        server.should_exit = True
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run CAIN Keeper")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--open", action="store_true", help="open the browser once the server is up")
     parser.add_argument("--no-open", action="store_true", help="never open the browser (packaged builds open it by default)")
+    parser.add_argument("--native", dest="native", action="store_true", default=None,
+                         help="open in a native app window instead of the browser (default for packaged builds)")
+    parser.add_argument("--browser", dest="native", action="store_false",
+                         help="force the browser tab instead of a native window")
     parser.add_argument("--reload", action="store_true", help="auto-reload on code changes (dev, source only)")
     args = parser.parse_args()
 
@@ -576,13 +640,24 @@ def main() -> None:
     threading.Thread(target=_check_for_update_in_background, daemon=True).start()
 
     url = f"http://{args.host}:{args.port}"
-    # A double-clicked packaged executable should just open the app.
+    print(f"CAIN Keeper running at {url}  (Ctrl+C to stop)")
+    print(f"Data folder: {storage.DATA_DIR}")
+
+    # A double-clicked packaged executable opens as a real app window by
+    # default; --browser (or a missing/broken webview backend) falls back to
+    # the plain browser-tab behaviour source installs have always used.
+    native = (args.native if args.native is not None else storage.FROZEN) and _native_mode_possible()
+    if native:
+        try:
+            _run_native_window(url, args.host, args.port)
+            return
+        except Exception as exc:
+            print(f"Native window unavailable ({exc}); opening in the browser instead.")
+
     open_browser = (args.open or storage.FROZEN) and not args.no_open
     if open_browser:
         threading.Thread(target=_open_browser_when_ready, args=(url, args.host, args.port),
                          daemon=True).start()
-    print(f"CAIN Keeper running at {url}  (Ctrl+C to stop)")
-    print(f"Data folder: {storage.DATA_DIR}")
     if args.reload and not storage.FROZEN:
         uvicorn.run("main:app", host=args.host, port=args.port, reload=True)
     else:

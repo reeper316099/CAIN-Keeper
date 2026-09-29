@@ -1,7 +1,7 @@
 # macOS package.
 #   - every push to main and every pull request: build + smoke test, upload a
 #     downloadable artifact to the workflow run
-#   - pushing a tag like v1.0.0: same, plus the zip is attached to the
+#   - pushing a tag like v1.0.0: same, plus the zip and installer are attached to the
 #     GitHub Release for that tag (created automatically)
 #   - "Run workflow" button: manual build on demand
 name: Package · macOS

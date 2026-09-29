@@ -34,7 +34,12 @@ def main() -> int:
     port = free_port()
     data_dir = tempfile.mkdtemp(prefix="cain-keeper-smoke-")
     env = {**os.environ, "CAIN_KEEPER_DATA": data_dir}
-    proc = subprocess.Popen([exe, "--port", str(port), "--no-open"], env=env,
+    # --browser --no-open: run in plain server mode, never the native window.
+    # A packaged build defaults to a native window, but CI runners have no
+    # display, and on Linux GTK hard-exits the process if it can't open one
+    # (see main.py's _native_mode_possible() guard) - this smoke test's job
+    # is to check the server and bundled files, not the GUI.
+    proc = subprocess.Popen([exe, "--port", str(port), "--browser", "--no-open"], env=env,
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     base = f"http://127.0.0.1:{port}"
     try:
@@ -71,6 +76,10 @@ def main() -> int:
         assert update["frozen"] is True, "packaged build not reporting itself as frozen"
         assert update["method"] == "download", "packaged build should report the download update method"
         assert update["current"] not in ("", "unknown"), f"VERSION file not bundled correctly: {update['current']!r}"
+        # This smoke test always runs the portable build straight from
+        # dist/ (never installed to Program Files / Applications / as an
+        # AppImage), so it must report itself as such.
+        assert update["install_kind"] == "portable", f"expected install_kind 'portable', got {update['install_kind']!r}"
 
         print(f"smoke test passed on port {port}, data in {data_dir}")
         return 0
